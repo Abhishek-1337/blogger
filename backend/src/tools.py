@@ -1,10 +1,7 @@
-"""Free web search tool (DuckDuckGo via ddgs). No API key needed."""
-
 from ddgs import DDGS
 
 
 def web_search(query: str, max_results: int = 5) -> list[dict]:
-    """Search the web and return [{title, url, snippet}]."""
     results: list[dict] = []
     try:
         with DDGS() as ddgs:
