@@ -23,6 +23,7 @@ class BlogResponse(BaseModel):
     sections: list[OutlineSectionOut]
     outline_approved: bool
     outline_revisions: int
+    outline_feedback: str
 
 
 @app.get("/health")
@@ -41,6 +42,10 @@ async def generate_blog(req: BlogRequest):
         raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Blog generation failed: {e}")
+    
+    feedback = final.get("outline_feedback", "") or (
+        "Outline approved." if final.get("outline_approved") else ""
+    )
     return BlogResponse(
         query=query,
         research_brief=final.get("research_brief", ""),
@@ -48,4 +53,5 @@ async def generate_blog(req: BlogRequest):
         sections=final.get("sections", []),
         outline_approved=final.get("outline_approved", False),
         outline_revisions=final.get("outline_revisions", 0),
+        outline_feedback=feedback,
     )
