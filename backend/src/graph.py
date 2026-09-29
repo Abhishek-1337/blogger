@@ -11,6 +11,7 @@ from src.tools import web_search
 load_dotenv()
 
 MODEL = "gpt-4o-mini"
+MAX_OUTLINE_REVISIONS = 2
 
 class OutlineSection(BaseModel):
     """One blog section: title plus writer's talking points."""
@@ -33,12 +34,25 @@ class BlogOutline(BaseModel):
     )
 
 
+class OutlineVerdict(BaseModel):
+    """LLM critique of the outline: approve or request a rewrite."""
+
+    approved: bool = Field(description="True if the outline is good enough to keep")
+    feedback: str = Field(
+        default="",
+        description="If not approved: specific actionable fixes for the rewrite. Empty if approved.",
+    )
+
+
 class BlogState(TypedDict):
     query: str
     search_results: list[dict]
     research_brief: str
     outline: list[str]
     sections: list[dict]
+    outline_feedback: str
+    outline_revisions: int
+    outline_approved: bool
 
 
 def _llm(temperature: float = 0.3) -> ChatOpenAI:
@@ -95,12 +109,30 @@ def summarize_node(state: BlogState) -> dict:
 
 
 def outline_node(state: BlogState) -> dict:
-    structured_llm = _llm(0.4).with_structured_output(BlogOutline)
+    structured_llm = _llm(0.7).with_structured_output(BlogOutline)
+    feedback = state.get("outline_feedback", "") or ""
+    revisions = state.get("outline_revisions", 0) or 0
+    previous = ""
+    if state.get("sections"):
+        previous = "\n".join(
+            f"- {s.get('title', '')}: {'; '.join(s.get('bullets', []))}"
+            for s in state["sections"]
+        )
+    retry_block = (
+        f"""
+    Previous attempt (revise, don't repeat its mistakes):
+    {previous}
+
+    Critic feedback to fix:
+    {feedback}"""
+        if feedback
+        else ""
+    )
     prompt = f"""Based on this research brief, create a blog outline of 4-6 sections.
 
     Research brief:
     {state['research_brief']}
-
+{retry_block}
     Rules:
     - 4-6 sections in logical narrative flow, each building on the previous.
     - Each section: a short title plus 3-5 concrete talking points (facts, examples, stats from the brief).
@@ -116,7 +148,45 @@ def outline_node(state: BlogState) -> dict:
     ]
     if len(outline) < 4:
         raise ValueError(f"Outline validation failed. LLM returned:\n{result}")
-    return {"outline": outline, "sections": sections}
+    return {
+        "outline": outline,
+        "sections": sections,
+        "outline_revisions": revisions + 1,
+        "outline_feedback": "",
+    }
+
+
+def verify_outline_node(state: BlogState) -> dict:
+    critic = _llm(0.2).with_structured_output(OutlineVerdict)
+    outline_text = "\n".join(
+        f"{i}. {s.get('title', '')}\n"
+        + "\n".join(f"   - {b}" for b in s.get("bullets", []))
+        for i, s in enumerate(state["sections"], 1)
+    )
+    prompt = f"""You are a strict expertq blog editor. Topic: "{state['query']}"
+
+    Research brief:
+    {state['research_brief']}
+
+    Proposed outline ({len(state['sections'])} sections):
+    {outline_text}
+
+    Approve only if ALL hold:
+    - Covers the brief's key points with no major gap
+    - Sections flow logically, no heavy overlap, titles specific (not generic)
+    - Bullets are concrete and grounded in the brief (not filler)
+
+    If any fail, approved=false with specific fixes (what to add/drop/merge/split)."""
+    verdict = critic.invoke(prompt)
+    return {"outline_approved": verdict.approved, "outline_feedback": verdict.feedback}
+
+
+def _should_retry_outline(state: BlogState) -> str:
+    if state.get("outline_approved"):
+        return END
+    if state.get("outline_revisions", 0) >= MAX_OUTLINE_REVISIONS:
+        return END
+    return "outline"
 
 
 def build_graph():
@@ -125,12 +195,17 @@ def build_graph():
     graph.add_node("research", research_node)
     graph.add_node("summarize", summarize_node)
     graph.add_node("outline", outline_node)
+    graph.add_node("verify_outline", verify_outline_node)
 
     graph.set_entry_point("research")
 
     graph.add_edge("research", "summarize")
     graph.add_edge("summarize", "outline")
-    graph.add_edge("outline", END)
+    graph.add_edge("outline", "verify_outline")
+
+    graph.add_conditional_edges(
+        "verify_outline", _should_retry_outline, {"outline": "outline", END: END}
+    )
 
     return graph.compile()
 
@@ -144,10 +219,12 @@ def run_blog(query: str) -> dict:
             "research_brief": "",
             "outline": [],
             "sections": [],
+            "outline_feedback": "",
+            "outline_revisions": 0,
+            "outline_approved": False,
         }
     )
 
 
-# Backwards compat for Phase 1 callers
 def run_research(query: str) -> str:
     return run_blog(query)["research_brief"]
