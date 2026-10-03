@@ -1,10 +1,21 @@
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
 from fastapi.concurrency import run_in_threadpool
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from src.graph import run_blog
 
 app = FastAPI(title="Blogger API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class BlogRequest(BaseModel):
@@ -55,3 +66,8 @@ async def generate_blog(req: BlogRequest):
         outline_revisions=final.get("outline_revisions", 0),
         outline_feedback=feedback,
     )
+
+
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+if FRONTEND_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
