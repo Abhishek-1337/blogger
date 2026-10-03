@@ -19,7 +19,11 @@ function Verdict({ data }) {
         {" "}
         — outline after {revs} revision{revs === 1 ? "" : "s"}.
       </span>
-      {feedback && <p className="mt-1.5">{feedback}</p>}
+      {feedback && (
+        <div className="md-body mt-1.5">
+          <Markdown>{feedback}</Markdown>
+        </div>
+      )}
     </div>
   );
 }
@@ -158,8 +162,8 @@ export default function App() {
               <h2 className="mb-3 border-b border-line pb-2 font-serif text-[22px]">
                 Research brief
               </h2>
-              <div className="whitespace-pre-wrap text-[15px]">
-                {result.research_brief || "(no brief returned)"}
+              <div className="md-body text-[15px]">
+                <Markdown>{result.research_brief || "(no brief returned)"}</Markdown>
               </div>
             </article>
 

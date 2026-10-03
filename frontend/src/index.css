@@ -9,3 +9,62 @@
   --color-wash: #f1efe9;
   --color-clay: #8a3b2e;
 }
+
+.md-body > :first-child {
+  margin-top: 0;
+}
+
+.md-body > :last-child {
+  margin-bottom: 0;
+}
+
+.md-body h1,
+.md-body h2,
+.md-body h3 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-pine);
+  margin: 22px 0 8px;
+}
+
+::selection {
+  background: var(--color-pine);
+  color: #fff;
+}
+
+.md-body h4,
+.md-body h5,
+.md-body h6 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 16px 0 6px;
+}
+
+.md-body p {
+  margin: 0 0 10px;
+}
+
+.md-body ul,
+.md-body ol {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+
+.md-body ul {
+  list-style: disc;
+}
+
+.md-body ol {
+  list-style: decimal;
+}
+
+.md-body li {
+  margin-bottom: 4px;
+}
+
+.md-body a {
+  color: var(--color-pine);
+  text-decoration: underline;
+}
