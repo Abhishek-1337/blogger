@@ -2,6 +2,7 @@ import os
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from dotenv import load_dotenv
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from src.models import SearchEntry
@@ -63,3 +64,22 @@ async def save_search_entry(data: dict) -> int:
         await session.commit()
         await session.refresh(entry)
         return entry.id
+
+
+async def list_search_entries(limit: int = 50) -> list[SearchEntry]:
+    """Newest-first search summaries (full rows; callers pick fields)."""
+    factory = get_session_factory()
+    async with factory() as session:
+        result = await session.execute(
+            select(SearchEntry)
+            .order_by(desc(SearchEntry.created_at), desc(SearchEntry.id))
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
+
+async def get_search_entry(entry_id: int) -> SearchEntry | None:
+    """One stored search result by id, or None."""
+    factory = get_session_factory()
+    async with factory() as session:
+        return await session.get(SearchEntry, entry_id)
