@@ -13,7 +13,7 @@ function Verdict({ data }) {
   const revs = data.outline_revisions ?? 0;
   const feedback = (data.outline_feedback || "").trim();
   return (
-    <div className="mb-6 rounded-lg border border-line bg-wash px-4 py-3 text-sm">
+    <div className="mb-6 rounded-lg border border-pine/25 bg-[#edf2ef] px-4 py-3 text-sm">
       <strong className="text-pine">{approved ? "Approved" : "Draft"}</strong>
       <span>
         {" "}
@@ -87,24 +87,41 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-white font-sans text-ink">
-      <header className="border-b-[3px] border-double border-ink">
-        <div className="mx-auto flex max-w-3xl items-baseline justify-between gap-4 px-5 pb-3.5 pt-5">
+    <div className="min-h-screen bg-white font-sans text-ink antialiased">
+      <header className="bg-pine text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.2)]">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-3">
           <div className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-pine font-serif text-2xl font-bold text-white">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-white font-serif text-xl font-bold text-pine ring-1 ring-black/10">
               B
             </span>
             <div>
-              <p className="font-serif text-[26px] font-bold leading-tight">Blogger</p>
-              <p className="text-[13px] text-fog">Research-backed blog outlines</p>
+              <p className="font-serif text-[22px] font-bold leading-none tracking-tight">
+                Blogger
+              </p>
+              <p className="mt-1 text-xs text-white/75">
+                Research-backed blog outlines
+              </p>
             </div>
           </div>
+          <a
+            href="/docs"
+            className="rounded-md px-3 py-1.5 text-[13px] font-semibold text-white/80 underline decoration-ochre decoration-2 underline-offset-4 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            API docs
+          </a>
         </div>
+        <div className="h-[3px] bg-ochre" aria-hidden="true" />
       </header>
 
-      <main className="mx-auto max-w-3xl px-5 pb-16 pt-7">
-        <section aria-label="New blog topic">
-          <label htmlFor="query" className="mb-3 block font-serif text-[22px] font-bold">
+      <main className="mx-auto max-w-5xl px-5 pb-16 pt-7">
+        <section
+          aria-label="New blog topic"
+          className="rounded-xl border border-line bg-wash/60 p-5 sm:p-6"
+        >
+          <label
+            htmlFor="query"
+            className="mb-3 block font-serif text-[22px] font-bold tracking-tight"
+          >
             What should the blog post be about?
           </label>
           <div className="flex flex-col gap-2.5 sm:flex-row">
@@ -118,13 +135,13 @@ export default function App() {
               maxLength={300}
               autoComplete="off"
               placeholder="e.g. urban composting for apartment dwellers"
-              className="flex-1 rounded-lg border border-line px-3.5 py-2.5 text-base outline-none focus:border-pine focus:ring-2 focus:ring-pine/40 disabled:opacity-60"
+              className="flex-1 rounded-lg border border-line bg-white px-3.5 py-2.5 text-base shadow-sm outline-none focus:border-pine focus:ring-2 focus:ring-pine/40 disabled:opacity-60"
             />
             <button
               type="button"
               onClick={generate}
               disabled={busy}
-              className="rounded-lg bg-pine px-6 py-2.5 text-base font-semibold text-white hover:brightness-90 disabled:cursor-wait disabled:opacity-55"
+              className="rounded-lg bg-pine px-6 py-2.5 text-base font-semibold text-white transition-colors hover:bg-pinedeep disabled:cursor-wait disabled:opacity-55"
             >
               {busy ? "Generating…" : "Generate"}
             </button>
@@ -189,11 +206,11 @@ export default function App() {
                   >
                     <span
                       aria-hidden="true"
-                      className="absolute left-0 top-4 font-serif text-xl font-bold text-pine"
+                      className="absolute left-0 top-3.5 font-serif text-[26px] font-bold leading-none text-ochre"
                     >
                       {String(i + 1).padStart(2, "0")}
                     </span>
-                    <h3 className="mb-2 text-[17px] font-semibold">
+                    <h3 className="mb-2 font-serif text-[19px] font-bold tracking-tight">
                       {section.title || "Untitled"}
                     </h3>
                     <ul className="list-disc pl-5 text-[14.5px] text-[#33352f]">
