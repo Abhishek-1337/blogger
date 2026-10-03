@@ -3,6 +3,13 @@ export interface OutlineSection {
   bullets: string[];
 }
 
+export interface SearchSummary {
+  id: number;
+  query: string;
+  created_at: string;
+  outline_approved: boolean;
+}
+
 export interface BlogResponse {
   id: number | null;
   query: string;
