@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import Markdown from "react-markdown";
 
+const API_URL = import.meta.env.VITE_API_URL ?? "";
+
 const STAGES = [
   "Searching the web",
   "Writing research brief",
@@ -54,7 +56,7 @@ export default function App() {
     setActiveStage(0);
     setBusy(true);
     try {
-      const res = await fetch("/blog", {
+      const res = await fetch(`${API_URL}/blog`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: topic }),
