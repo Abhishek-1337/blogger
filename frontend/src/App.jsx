@@ -147,8 +147,12 @@ export default function App() {
           <section aria-label="Generation progress" className="mt-7">
             <p
               role="status"
-              className="inline-block rounded-full border border-pine bg-white px-3.5 py-1.5 text-[13px] font-semibold text-pine"
+              className="inline-flex items-center gap-2.5 rounded-full border border-pine bg-white px-3.5 py-1.5 text-[13px] font-semibold text-pine"
             >
+              <span
+                aria-hidden="true"
+                className="inline-block h-4 w-4 rounded-full border-2 border-line border-t-pine motion-safe:animate-spin"
+              />
               {STAGES[activeStage]}…
             </p>
           </section>
