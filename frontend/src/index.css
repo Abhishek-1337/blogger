@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-serif: Georgia, "Times New Roman", serif;
   --color-pine: #1f5c4d;
@@ -10,6 +12,41 @@
   --color-line: #ddd9cf;
   --color-wash: #f1efe9;
   --color-clay: #8a3b2e;
+  --color-night: #141613;
+  --color-panel: #1b1f1b;
+  --color-field: #101310;
+  --color-sage: #8fd0ae;
+  --color-rose: #e8a090;
+}
+
+.dark {
+  --color-ink: #eceee6;
+  --color-fog: #a9b1a3;
+  --color-line: #263027;
+  --color-wash: #1a211b;
+  --color-night: #0c0f0d;
+  --color-panel: #131915;
+  --color-field: #090c0a;
+}
+
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+  background-color: var(--color-night);
+}
+
+body {
+  text-rendering: optimizeLegibility;
+}
+
+.dark .md-body h1,
+.dark .md-body h2,
+.dark .md-body h3,
+.dark .md-body a {
+  color: var(--color-sage);
 }
 
 .md-body > :first-child {
@@ -34,6 +71,80 @@
 ::selection {
   background: var(--color-pine);
   color: #fff;
+}
+
+.dark ::selection {
+  background: rgba(143, 208, 174, 0.32);
+  color: #f3f6f0;
+}
+
+.dark * {
+  scrollbar-color: #2f3a31 transparent;
+}
+
+.dark ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #2a342c;
+  border-radius: 8px;
+  border: 2px solid #0c0f0d;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dark input::placeholder {
+  color: #78817a;
+}
+
+.dark :focus-visible {
+  outline: 2px solid rgba(143, 208, 174, 0.6);
+  outline-offset: 2px;
+}
+
+.dark .md-body {
+  color: #d3d8cb;
+}
+
+.dark .md-body strong {
+  color: #eef2e9;
+}
+
+.dark .md-body code {
+  background: rgba(143, 208, 174, 0.1);
+  border: 1px solid rgba(143, 208, 174, 0.18);
+  border-radius: 6px;
+  padding: 0.1em 0.35em;
+  font-size: 0.88em;
+  color: #c9e8d4;
+}
+
+.dark .md-body pre {
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 14px 16px;
+  overflow-x: auto;
+}
+
+.dark .md-body pre code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+.dark .md-body blockquote {
+  border-left: 3px solid rgba(143, 208, 174, 0.4);
+  padding-left: 12px;
+  color: #b9c1b1;
+}
+
+.dark .md-body hr {
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .md-body h4,
