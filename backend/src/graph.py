@@ -1,16 +1,17 @@
 import os
-from typing import TypedDict
 from pydantic import BaseModel, Field
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
-from src.tools import web_search
+from src.research_agent import research_agent_node, verify_research_node
+from src.schema import BlogState
 
 load_dotenv()
 
 MODEL = "gpt-4o-mini"
+MAX_RESEARCH_REVISIONS = 2
 MAX_OUTLINE_REVISIONS = 2
 
 class OutlineSection(BaseModel):
@@ -44,45 +45,10 @@ class OutlineVerdict(BaseModel):
     )
 
 
-class BlogState(TypedDict):
-    query: str
-    search_results: list[dict]
-    research_brief: str
-    outline: list[str]
-    sections: list[dict]
-    outline_feedback: str
-    outline_revisions: int
-    outline_approved: bool
-
-
 def _llm(temperature: float = 0.3) -> ChatOpenAI:
     if not os.getenv("OPENAI_API_KEY"):
         raise ValueError("OPENAI_API_KEY not set.")
     return ChatOpenAI(model=MODEL, temperature=temperature)
-
-
-def _search_angles(query: str) -> list[str]:
-    return [
-        f"{query} overview explained",
-        f"{query} latest trends 2025 2026",
-        f"{query} key statistics and debates",
-    ]
-
-
-def research_node(state: BlogState) -> dict:
-    query = state["query"]
-
-    all_results: list[dict] = []
-    for angle in _search_angles(query):
-        all_results.extend(web_search(angle, max_results=5))
-
-    seen, deduped = set(), []
-    for r in all_results:
-        url = r.get("url", "")
-        if url and url not in seen:
-            seen.add(url)
-            deduped.append(r)
-    return {"search_results": deduped[:12]}
 
 
 def summarize_node(state: BlogState) -> dict:
@@ -181,6 +147,14 @@ def verify_outline_node(state: BlogState) -> dict:
     return {"outline_approved": verdict.approved, "outline_feedback": verdict.feedback}
 
 
+def _should_retry_research(state: BlogState) -> str:
+    if state.get("research_approved"):
+        return "summarize"
+    if state.get("research_revisions", 0) >= MAX_RESEARCH_REVISIONS:
+        return "summarize"
+    return "research"
+
+
 def _should_retry_outline(state: BlogState) -> str:
     if state.get("outline_approved"):
         return END
@@ -192,14 +166,20 @@ def _should_retry_outline(state: BlogState) -> str:
 def build_graph():
     graph = StateGraph(BlogState)
 
-    graph.add_node("research", research_node)
+    graph.add_node("research", research_agent_node)
+    graph.add_node("verify_research", verify_research_node)
     graph.add_node("summarize", summarize_node)
     graph.add_node("outline", outline_node)
     graph.add_node("verify_outline", verify_outline_node)
 
     graph.set_entry_point("research")
 
-    graph.add_edge("research", "summarize")
+    graph.add_conditional_edges(
+        "verify_research",
+        _should_retry_research,
+        {"research": "research", "summarize": "summarize"},
+    )
+    graph.add_edge("research", "verify_research")
     graph.add_edge("summarize", "outline")
     graph.add_edge("outline", "verify_outline")
 
@@ -217,6 +197,9 @@ def run_blog(query: str) -> dict:
             "query": query,
             "search_results": [],
             "research_brief": "",
+            "research_approved": False,
+            "research_feedback": "",
+            "research_revisions": 0,
             "outline": [],
             "sections": [],
             "outline_feedback": "",
