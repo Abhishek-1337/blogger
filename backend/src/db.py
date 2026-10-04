@@ -3,54 +3,90 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from dotenv import load_dotenv
 from sqlalchemy import desc, select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 
 from src.models import SearchEntry
 
 load_dotenv()
 
 
-def normalize_database_url(url: str) -> str:
-    """Adapt a generic Postgres URL for SQLAlchemy + asyncpg.
+def _normalize_db_url(url: str) -> str:
+    """Ensure URL uses the asyncpg driver for the app runtime.
 
-    Drops the ``channel_binding`` query param: cloud providers (e.g. Neon)
-    add it, but asyncpg's ``connect()`` takes no such keyword and SQLAlchemy
-    forwards URL params as keywords, which raises TypeError. Encryption and
-    SCRAM auth via ``sslmode`` are unaffected.
+    Also drops the ``channel_binding`` query param: cloud providers
+    (e.g. Neon) add it, but asyncpg's ``connect()`` takes no such keyword
+    and SQLAlchemy forwards URL params as keywords, which raises TypeError.
+    ``sslmode`` is left in place — the asyncpg dialect translates it.
     """
+    if not url:
+        return url
     url = url.strip()
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql+asyncpg://", 1)
-    elif url.startswith("postgresql://"):
-        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
     parts = urlsplit(url)
     query = [(k, v) for k, v in parse_qsl(parts.query) if k != "channel_binding"]
     return urlunsplit(parts._replace(query=urlencode(query)))
 
 
-def get_database_url() -> str:
-    url = os.getenv("DATABASE_URL", "")
-    if not url.strip():
-        raise ValueError("DATABASE_URL not set.")
-    return normalize_database_url(url)
+_raw_url = os.getenv("DATABASE_URL")
+if not _raw_url:
+    raise RuntimeError(
+        "DATABASE_URL is not set — check backend/.env or docker-compose environment"
+    )
+_DATABASE_URL = _normalize_db_url(_raw_url)
+
+_ssl_mode = os.getenv("DATABASE_SSL", "").lower().strip()
+if _ssl_mode in ("require", "true", "1"):
+    _connect_args = {"ssl": "require"}
+elif _ssl_mode in ("disable", "false", "0"):
+    _connect_args = {}
+else:
+    _is_local = any(
+        h in _DATABASE_URL
+        for h in [
+            "@db:",
+            "@db/",
+            "@localhost",
+            "@127.0.0.1",
+            "localhost:",
+            "127.0.0.1:",
+        ]
+    )
+    _needs_ssl = any(
+        h in _DATABASE_URL
+        for h in ["neon.tech", "supabase.co", "rds.amazonaws.com", "sslmode=require"]
+    )
+    if _needs_ssl or not _is_local:
+        _connect_args = {} if _is_local else {"ssl": "require"}
+    else:
+        _connect_args = {}
+
+engine = create_async_engine(
+    _DATABASE_URL,
+    connect_args=_connect_args,
+    echo=False,
+)
+
+SessionLocal = async_sessionmaker(
+    engine,
+    expire_on_commit=False,
+)
 
 
-_engine = None
-_session_factory = None
-
-
-def get_session_factory() -> async_sessionmaker[AsyncSession]:
-    global _engine, _session_factory
-    if _session_factory is None:
-        _engine = create_async_engine(get_database_url(), pool_pre_ping=True)
-        _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
-    return _session_factory
+async def get_db():
+    async with SessionLocal() as session:
+        yield session
 
 
 async def save_search_entry(data: dict) -> int:
     """Persist one search result. Returns the new row id."""
-    factory = get_session_factory()
-    async with factory() as session:
+    async with SessionLocal() as session:
         entry = SearchEntry(
             query=data.get("query", ""),
             research_brief=data.get("research_brief", ""),
@@ -67,9 +103,8 @@ async def save_search_entry(data: dict) -> int:
 
 
 async def list_search_entries(limit: int = 50) -> list[SearchEntry]:
-    """Newest-first search summaries (full rows; callers pick fields)."""
-    factory = get_session_factory()
-    async with factory() as session:
+    """Newest-first search entries."""
+    async with SessionLocal() as session:
         result = await session.execute(
             select(SearchEntry)
             .order_by(desc(SearchEntry.created_at), desc(SearchEntry.id))
@@ -80,6 +115,5 @@ async def list_search_entries(limit: int = 50) -> list[SearchEntry]:
 
 async def get_search_entry(entry_id: int) -> SearchEntry | None:
     """One stored search result by id, or None."""
-    factory = get_session_factory()
-    async with factory() as session:
+    async with SessionLocal() as session:
         return await session.get(SearchEntry, entry_id)

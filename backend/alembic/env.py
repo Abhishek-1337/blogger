@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 load_dotenv()
 
-from src.db import normalize_database_url  # noqa: E402
+from src.db import _normalize_db_url as normalize_database_url  # noqa: E402
 from src.models import Base  # noqa: E402
 
 config = context.config
