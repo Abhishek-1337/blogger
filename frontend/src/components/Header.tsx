@@ -1,9 +1,38 @@
-export default function Header() {
+import ThemeToggle from "./ThemeToggle";
+
+interface HeaderProps {
+  onMenu?: () => void;
+}
+
+export default function Header({ onMenu }: HeaderProps) {
   return (
-    <header className="bg-pine text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.2)]">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-3">
+    <header className="bg-pine text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.2)] dark:bg-[#0e1a15] dark:shadow-[0_1px_0_rgba(255,255,255,0.07),0_12px_32px_rgba(0,0,0,0.45)]">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3">
         <div className="flex items-center gap-3">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-white font-serif text-xl font-bold text-pine ring-1 ring-black/10">
+          {onMenu && (
+            <button
+              type="button"
+              onClick={onMenu}
+              aria-label="Open previous searches"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-white/85 transition-colors hover:bg-white/10 hover:text-white lg:hidden"
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <line x1="3" y1="5" x2="17" y2="5" />
+                <line x1="3" y1="10" x2="17" y2="10" />
+                <line x1="3" y1="15" x2="17" y2="15" />
+              </svg>
+            </button>
+          )}
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-white font-serif text-xl font-bold text-pine ring-1 ring-black/10 dark:bg-sage dark:text-[#0b1511] dark:shadow-[0_0_20px_rgba(143,208,174,0.35)] dark:ring-sage/40">
             B
           </span>
           <div>
@@ -15,12 +44,15 @@ export default function Header() {
             </p>
           </div>
         </div>
-        <a
-          href="/docs"
-          className="rounded-md px-3 py-1.5 text-[13px] font-semibold text-white/80 underline decoration-ochre decoration-2 underline-offset-4 transition-colors hover:bg-white/10 hover:text-white"
-        >
-          API docs
-        </a>
+        <div className="flex items-center gap-1">
+          <a
+            href="/docs"
+            className="rounded-md px-3 py-1.5 text-[13px] font-semibold text-white/80 underline decoration-ochre decoration-2 underline-offset-4 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            API docs
+          </a>
+          <ThemeToggle />
+        </div>
       </div>
       <div className="h-[3px] bg-ochre" aria-hidden="true" />
     </header>
