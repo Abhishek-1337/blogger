@@ -108,7 +108,7 @@ def _run_research_pass(query: str, feedback: str) -> list[dict]:
         if feedback
         else ""
     )
-    agent = create_agent(_llm(), tools, prompt=RESEARCH_PROMPT)
+    agent = create_agent(_llm(), tools, system_prompt=RESEARCH_PROMPT)
     result = agent.invoke(
         {
             "messages": [
