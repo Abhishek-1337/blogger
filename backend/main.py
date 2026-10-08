@@ -1,13 +1,19 @@
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from src.db import get_search_entry, list_search_entries, save_search_entry
+from src.auth import (
+    create_access_token,
+    get_current_user,
+    get_or_create_user,
+    verify_google_token,
+)
+from src.db import SessionLocal, get_search_entry, list_search_entries, save_search_entry
 from src.graph import run_blog
-from src.models import SearchEntry
+from src.models import SearchEntry, User
 
 app = FastAPI(title="Blogger API")
 
@@ -44,6 +50,46 @@ def health():
     return {"status": "ok"}
 
 
+class GoogleLoginRequest(BaseModel):
+    id_token: str = Field(min_length=1, description="Google ID token from GIS")
+
+
+class UserOut(BaseModel):
+    id: int
+    email: str
+    name: str
+    picture: str
+
+
+class LoginResponse(BaseModel):
+    token: str
+    user: UserOut
+
+
+def _to_user_out(user: User) -> UserOut:
+    return UserOut(
+        id=user.id, email=user.email, name=user.name, picture=user.picture
+    )
+
+
+@app.post("/auth/google", response_model=LoginResponse)
+async def google_login(req: GoogleLoginRequest):
+    try:
+        claims = verify_google_token(req.id_token)
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    async with SessionLocal() as session:
+        user = await get_or_create_user(session, claims)
+    return LoginResponse(
+        token=create_access_token(user.id), user=_to_user_out(user)
+    )
+
+
+@app.get("/auth/me", response_model=UserOut)
+async def me(user: User = Depends(get_current_user)):
+    return _to_user_out(user)
+
+
 class SearchSummaryOut(BaseModel):
     id: int
     query: str
@@ -65,9 +111,9 @@ def _to_blog_response(entry: SearchEntry) -> BlogResponse:
 
 
 @app.get("/searches", response_model=list[SearchSummaryOut])
-async def list_searches(limit: int = 50):
+async def list_searches(limit: int = 50, user: User = Depends(get_current_user)):
     try:
-        entries = await list_search_entries(min(max(limit, 1), 200))
+        entries = await list_search_entries(min(max(limit, 1), 200), user.id)
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
     return [
@@ -82,9 +128,9 @@ async def list_searches(limit: int = 50):
 
 
 @app.get("/searches/{entry_id}", response_model=BlogResponse)
-async def get_search(entry_id: int):
+async def get_search(entry_id: int, user: User = Depends(get_current_user)):
     try:
-        entry = await get_search_entry(entry_id)
+        entry = await get_search_entry(entry_id, user.id)
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
     if entry is None:
@@ -93,7 +139,7 @@ async def get_search(entry_id: int):
 
 
 @app.post("/blog", response_model=BlogResponse)
-async def generate_blog(req: BlogRequest):
+async def generate_blog(req: BlogRequest, user: User = Depends(get_current_user)):
     query = req.query.strip()
     if not query:
         raise HTTPException(status_code=422, detail="Query must not be empty.")
@@ -117,7 +163,8 @@ async def generate_blog(req: BlogRequest):
                 "outline_approved": final.get("outline_approved", False),
                 "outline_revisions": final.get("outline_revisions", 0),
                 "outline_feedback": feedback,
-            }
+            },
+            user.id,
         )
     except Exception as e:
         print(f"Warning: failed to persist search entry: {e}")

@@ -1,11 +1,26 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, Integer, Text, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, Text, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
     pass
+
+
+class User(Base):
+    """One Google-authenticated user."""
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    google_sub: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    email: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    name: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    picture: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
 
 
 class SearchEntry(Base):
@@ -14,6 +29,9 @@ class SearchEntry(Base):
     __tablename__ = "search_entries"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
     query: Mapped[str] = mapped_column(Text, nullable=False)
     research_brief: Mapped[str] = mapped_column(Text, nullable=False, default="")
     outline: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
