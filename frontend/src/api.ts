@@ -1,13 +1,49 @@
-import type { BlogResponse, SearchSummary } from "./types";
+import type { BlogResponse, LoginResponse, SearchSummary, User } from "./types";
 
 interface ErrorBody {
   detail?: string | Array<{ msg?: string }>;
 }
 
-export async function fetchBlog(query: string, apiUrl: string): Promise<BlogResponse> {
-  const res = await fetch(`${apiUrl}/blog`, {
+function authHeaders(token: string): Record<string, string> {
+  return {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
+}
+
+export async function loginWithGoogle(
+  apiUrl: string,
+  idToken: string
+): Promise<LoginResponse> {
+  const res = await fetch(`${apiUrl}/auth/google`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id_token: idToken }),
+  });
+  if (!res.ok) {
+    throw new Error(await readError(res, `Sign-in failed (${res.status}).`));
+  }
+  return (await res.json()) as LoginResponse;
+}
+
+export async function fetchMe(apiUrl: string, token: string): Promise<User> {
+  const res = await fetch(`${apiUrl}/auth/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    throw new Error(await readError(res, `Session expired (${res.status}).`));
+  }
+  return (await res.json()) as User;
+}
+
+export async function fetchBlog(
+  query: string,
+  apiUrl: string,
+  token: string
+): Promise<BlogResponse> {
+  const res = await fetch(`${apiUrl}/blog`, {
+    method: "POST",
+    headers: authHeaders(token),
     body: JSON.stringify({ query }),
   });
   if (!res.ok) {
@@ -44,8 +80,13 @@ async function readError(res: Response, fallback: string): Promise<string> {
   return fallback;
 }
 
-export async function fetchSearches(apiUrl: string): Promise<SearchSummary[]> {
-  const res = await fetch(`${apiUrl}/searches?limit=50`);
+export async function fetchSearches(
+  apiUrl: string,
+  token: string
+): Promise<SearchSummary[]> {
+  const res = await fetch(`${apiUrl}/searches?limit=50`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
   if (!res.ok) {
     throw new Error(await readError(res, `Request failed (${res.status}).`));
   }
@@ -54,9 +95,12 @@ export async function fetchSearches(apiUrl: string): Promise<SearchSummary[]> {
 
 export async function fetchSearch(
   apiUrl: string,
-  id: number
+  id: number,
+  token: string
 ): Promise<BlogResponse> {
-  const res = await fetch(`${apiUrl}/searches/${id}`);
+  const res = await fetch(`${apiUrl}/searches/${id}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
   if (!res.ok) {
     throw new Error(await readError(res, `Request failed (${res.status}).`));
   }

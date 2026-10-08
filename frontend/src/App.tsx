@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchBlog, fetchSearch, fetchSearches } from "./api";
+import { AuthProvider, GoogleSignInButton, useAuth } from "./auth";
 import type { BlogResponse, SearchSummary } from "./types";
 import Composer from "./components/Composer";
 import Header from "./components/Header";
@@ -18,7 +19,30 @@ const STAGES = [
   "Editor review",
 ];
 
-export default function App() {
+function SignInScreen() {
+  return (
+    <div className="mx-auto flex min-h-[70vh] max-w-md flex-col items-center justify-center px-5">
+      <div className="w-full rounded-xl border border-line bg-white p-8 text-center shadow-sm dark:border-white/10 dark:bg-panel dark:shadow-[0_16px_48px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.05)]">
+        <span className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-md bg-pine font-serif text-2xl font-bold text-white ring-1 ring-black/10 dark:bg-sage dark:text-[#0b1511]">
+          B
+        </span>
+        <h1 className="mt-4 font-serif text-2xl font-bold tracking-tight">
+          Sign in to Blogger
+        </h1>
+        <p className="mt-2 text-sm text-fog">
+          Use your Google account. Your searches and history stay private to
+          you.
+        </p>
+        <div className="mt-6">
+          <GoogleSignInButton />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Workspace() {
+  const { token, signOut } = useAuth();
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -33,9 +57,10 @@ export default function App() {
   const resultsRef = useRef<HTMLElement>(null);
 
   const loadHistory = useCallback(async () => {
+    if (!token) return;
     setHistoryLoading(true);
     try {
-      setHistory(await fetchSearches(API_URL));
+      setHistory(await fetchSearches(API_URL, token));
       setHistoryUnavailable(false);
     } catch {
       setHistory([]);
@@ -43,7 +68,7 @@ export default function App() {
     } finally {
       setHistoryLoading(false);
     }
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     void loadHistory();
@@ -84,13 +109,17 @@ export default function App() {
       setError("Enter a topic first.");
       return;
     }
+    if (!token) {
+      setError("Please sign in again.");
+      return;
+    }
     setError("");
     setResult(null);
     setSelectedId(null);
     setActiveStage(0);
     setBusy(true);
     try {
-      const data = await fetchBlog(topic, API_URL);
+      const data = await fetchBlog(topic, API_URL, token);
       setResult(data);
       setSelectedId(data.id ?? null);
       void loadHistory();
@@ -102,10 +131,11 @@ export default function App() {
   }
 
   async function openEntry(id: number) {
+    if (!token) return;
     setError("");
     setSelectingId(id);
     try {
-      const data = await fetchSearch(API_URL, id);
+      const data = await fetchSearch(API_URL, id, token);
       setResult(data);
       setSelectedId(data.id ?? id);
       setSidebarOpen(false);
@@ -130,8 +160,49 @@ export default function App() {
   );
 
   return (
+    <Shell onMenu={() => setSidebarOpen(true)} onSignOut={signOut} newSearch={newSearch} sidebarBody={sidebarBody} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>
+      <Composer
+        query={query}
+        busy={busy}
+        error={error}
+        onQueryChange={setQuery}
+        onSubmit={generate}
+      />
+
+      {busy && <ProgressPill stage={STAGES[activeStage]} />}
+
+      {result && (
+        <section ref={resultsRef} className="mt-8 scroll-mt-4">
+          <Verdict data={result} />
+          <ResearchBrief brief={result.research_brief} />
+          <Outline sections={result.sections || []} />
+        </section>
+      )}
+    </Shell>
+  );
+}
+
+function Shell({
+  children,
+  onMenu,
+  onSignOut,
+  newSearch,
+  sidebarBody,
+  sidebarOpen,
+  setSidebarOpen,
+}: {
+  children: React.ReactNode;
+  onMenu: () => void;
+  onSignOut: () => void;
+  newSearch: () => void;
+  sidebarBody: React.ReactNode;
+  sidebarOpen: boolean;
+  setSidebarOpen: (v: boolean) => void;
+}) {
+  const { user } = useAuth();
+  return (
     <div className="min-h-screen bg-white font-sans text-ink antialiased dark:bg-night dark:bg-[radial-gradient(1100px_480px_at_50%_-10%,rgba(143,208,174,0.09),transparent),radial-gradient(800px_380px_at_88%_0%,rgba(189,134,54,0.07),transparent)]">
-      <Header onMenu={() => setSidebarOpen(true)} />
+      <Header onMenu={onMenu} user={user} onSignOut={onSignOut} />
 
       <div className="mx-auto flex max-w-6xl items-start gap-8 px-5 pb-16 pt-7">
         {/* Desktop sidebar */}
@@ -154,25 +225,7 @@ export default function App() {
           {sidebarBody}
         </aside>
 
-        <main className="min-w-0 flex-1">
-          <Composer
-            query={query}
-            busy={busy}
-            error={error}
-            onQueryChange={setQuery}
-            onSubmit={generate}
-          />
-
-          {busy && <ProgressPill stage={STAGES[activeStage]} />}
-
-          {result && (
-            <section ref={resultsRef} className="mt-8 scroll-mt-4">
-              <Verdict data={result} />
-              <ResearchBrief brief={result.research_brief} />
-              <Outline sections={result.sections || []} />
-            </section>
-          )}
-        </main>
+        <main className="min-w-0 flex-1">{children}</main>
       </div>
 
       {/* Mobile drawer */}
@@ -216,5 +269,26 @@ export default function App() {
         </div>
       )}
     </div>
+  );
+}
+
+function GatedApp() {
+  const { user, ready } = useAuth();
+  if (!ready) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-sm text-fog">Loading…</p>
+      </div>
+    );
+  }
+  if (!user) return <SignInScreen />;
+  return <Workspace />;
+}
+
+export default function App() {
+  return (
+    <AuthProvider apiUrl={API_URL}>
+      <GatedApp />
+    </AuthProvider>
   );
 }

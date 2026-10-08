@@ -1,10 +1,13 @@
 import ThemeToggle from "./ThemeToggle";
+import type { User } from "../types";
 
 interface HeaderProps {
   onMenu?: () => void;
+  user?: User | null;
+  onSignOut?: () => void;
 }
 
-export default function Header({ onMenu }: HeaderProps) {
+export default function Header({ onMenu, user, onSignOut }: HeaderProps) {
   return (
     <header className="bg-pine text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.2)] dark:bg-[#0e1a15] dark:shadow-[0_1px_0_rgba(255,255,255,0.07),0_12px_32px_rgba(0,0,0,0.45)]">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3">
@@ -51,6 +54,32 @@ export default function Header({ onMenu }: HeaderProps) {
           >
             API docs
           </a>
+          {user && (
+            <div className="flex items-center gap-2 pl-1">
+              {user.picture ? (
+                <img
+                  src={user.picture}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  className="h-8 w-8 rounded-full ring-1 ring-white/30"
+                />
+              ) : (
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-sm font-bold">
+                  {(user.name || user.email || "?").charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span className="hidden max-w-32 truncate text-[13px] font-semibold text-white/85 sm:inline">
+                {user.name || user.email}
+              </span>
+              <button
+                type="button"
+                onClick={onSignOut}
+                className="rounded-md px-2 py-1.5 text-[13px] font-semibold text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                Sign out
+              </button>
+            </div>
+          )}
           <ThemeToggle />
         </div>
       </div>

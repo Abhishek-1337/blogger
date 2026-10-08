@@ -10,6 +10,18 @@ export interface SearchSummary {
   outline_approved: boolean;
 }
 
+export interface User {
+  id: number;
+  email: string;
+  name: string;
+  picture: string;
+}
+
+export interface LoginResponse {
+  token: string;
+  user: User;
+}
+
 export interface BlogResponse {
   id: number | null;
   query: string;
