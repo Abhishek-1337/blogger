@@ -5,13 +5,12 @@ from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
 
-from src.research_agent import research_agent_node, verify_research_node
+from src.research_agent import research_agent_node
 from src.schema import BlogState
 
 load_dotenv()
 
 MODEL = "gpt-4o-mini"
-MAX_RESEARCH_REVISIONS = 2
 MAX_OUTLINE_REVISIONS = 2
 
 class OutlineSection(BaseModel):
@@ -147,14 +146,6 @@ def verify_outline_node(state: BlogState) -> dict:
     return {"outline_approved": verdict.approved, "outline_feedback": verdict.feedback}
 
 
-def _should_retry_research(state: BlogState) -> str:
-    if state.get("research_approved"):
-        return "summarize"
-    if state.get("research_revisions", 0) >= MAX_RESEARCH_REVISIONS:
-        return "summarize"
-    return "research"
-
-
 def _should_retry_outline(state: BlogState) -> str:
     if state.get("outline_approved"):
         return END
@@ -167,19 +158,13 @@ def build_graph():
     graph = StateGraph(BlogState)
 
     graph.add_node("research", research_agent_node)
-    graph.add_node("verify_research", verify_research_node)
     graph.add_node("summarize", summarize_node)
     graph.add_node("outline", outline_node)
     graph.add_node("verify_outline", verify_outline_node)
 
     graph.set_entry_point("research")
 
-    graph.add_conditional_edges(
-        "verify_research",
-        _should_retry_research,
-        {"research": "research", "summarize": "summarize"},
-    )
-    graph.add_edge("research", "verify_research")
+    graph.add_edge("research", "summarize")
     graph.add_edge("summarize", "outline")
     graph.add_edge("outline", "verify_outline")
 

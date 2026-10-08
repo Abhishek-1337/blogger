@@ -1,19 +1,10 @@
-"""ReAct research agent: one angle in, evidence out.
-
-The agent loop (plan angle -> search -> observe -> repeat) is driven by the
-LLM through ``create_react_agent``. The graph never trusts the transcript:
-``research_agent_node`` rebuilds ``search_results`` deterministically from the
-tool messages, so the downstream pipeline sees the same shape it always has.
-``verify_research_node`` then gates quality like the outline critic does.
-"""
-
 import json
 import os
 
 from dotenv import load_dotenv
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 from pydantic import BaseModel, Field
 
 from src.schema import BlogState
@@ -23,6 +14,7 @@ load_dotenv()
 
 MODEL = "gpt-4o-mini"
 MAX_RESULTS = 12
+MAX_RESEARCH_REVISIONS = 2
 
 RESEARCH_PROMPT = """You are a blog research assistant. Research the given topic
 thoroughly using the search_web tool.
@@ -75,16 +67,17 @@ class ResearchVerdict(BaseModel):
     )
 
 
-def verify_research_node(state: BlogState) -> dict:
+def _verify_results(query: str, search_results: list[dict]) -> ResearchVerdict:
+    """Critic pass over collected evidence: approve or request more angles."""
     critic = _llm(0.2).with_structured_output(ResearchVerdict)
     evidence = "\n".join(
         f"{i}. {r.get('title', '')} ({r.get('url', '')}): "
         f"{(r.get('snippet', '') or '')[:400]}"
-        for i, r in enumerate(state["search_results"], 1)
+        for i, r in enumerate(search_results, 1)
     )
-    prompt = f"""You are a strict research editor. Topic: "{state['query']}"
+    prompt = f"""You are a strict research editor. Topic: "{query}"
 
-Collected evidence ({len(state['search_results'])} results):
+Collected evidence ({len(search_results)} results):
 {evidence}
 
 Approve only if ALL hold:
@@ -95,30 +88,33 @@ Approve only if ALL hold:
 
 If any fail, approved=false with specific fixes (which angles are missing,
 what to re-search)."""
-    verdict = critic.invoke(prompt)
+    return critic.invoke(prompt)
+
+
+def verify_research_node(state: BlogState) -> dict:
+    """Graph-compat wrapper; the live loop now lives in research_agent_node."""
+    verdict = _verify_results(state["query"], state["search_results"])
     return {
         "research_approved": verdict.approved,
         "research_feedback": verdict.feedback,
     }
 
 
-def research_agent_node(state: BlogState) -> dict:
-    """Run the research agent; return evidence plus revision bookkeeping."""
-    revisions = state.get("research_revisions", 0) or 0
-    feedback = state.get("research_feedback", "") or ""
+def _run_research_pass(query: str, feedback: str) -> list[dict]:
+    """One agent pass; returns raw collected result dicts."""
     retry_block = (
         "\nA previous attempt was rejected — adjust your searches accordingly:\n"
         f"Critic feedback: {feedback}"
         if feedback
         else ""
     )
-    agent = create_react_agent(_llm(), tools, prompt=RESEARCH_PROMPT)
+    agent = create_agent(_llm(), tools, prompt=RESEARCH_PROMPT)
     result = agent.invoke(
         {
             "messages": [
                 {
                     "role": "user",
-                    "content": f"Research this topic: {state['query']}{retry_block}",
+                    "content": f"Research this topic: {query}{retry_block}",
                 }
             ]
         }
@@ -137,10 +133,35 @@ def research_agent_node(state: BlogState) -> dict:
 
     if not collected:
         # Agent answered without searching — never starve the pipeline.
-        collected = web_search(state["query"], max_results=MAX_RESULTS)
+        collected = web_search(query, max_results=MAX_RESULTS)
+    return collected
+
+
+def research_agent_node(state: BlogState) -> dict:
+    """Research with an internal verify-and-retry loop.
+
+    Negative critic feedback feeds back into the next search pass, and
+    evidence accumulates across passes so a retry adds angles instead of
+    discarding the first pass.
+    """
+    revisions = state.get("research_revisions", 0) or 0
+    feedback = state.get("research_feedback", "") or ""
+    accumulated: list[dict] = list(state.get("search_results", []) or [])
+    approved = False
+
+    for _ in range(MAX_RESEARCH_REVISIONS):
+        collected = _run_research_pass(state["query"], feedback)
+        accumulated = _dedupe([*accumulated, *collected])
+        verdict = _verify_results(state["query"], accumulated)
+        approved = verdict.approved
+        revisions += 1
+        feedback = "" if approved else verdict.feedback
+        if approved:
+            break
 
     return {
-        "search_results": _dedupe(collected),
-        "research_revisions": revisions + 1,
-        "research_feedback": "",
+        "search_results": accumulated,
+        "research_revisions": revisions,
+        "research_approved": approved,
+        "research_feedback": feedback,
     }
