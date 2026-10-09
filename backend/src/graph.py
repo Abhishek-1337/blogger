@@ -7,6 +7,15 @@ from langgraph.graph import END, StateGraph
 
 from src.research_agent import research_agent_node
 from src.schema import BlogState
+from src.usage import UsageCollector, get_active_collector, stage
+
+
+def _usage_config() -> dict:
+    """LangChain config routing every LLM call to the active collector."""
+    collector = get_active_collector()
+    if collector is None:
+        return {}
+    return {"callbacks": collector.callbacks}
 
 load_dotenv()
 
@@ -69,7 +78,8 @@ def summarize_node(state: BlogState) -> dict:
     4. Sources (list the URLs used)
 
     Keep it factual, cite only from the evidence above."""
-    brief = llm.invoke(prompt).content
+    with stage("summarize"):
+        brief = llm.invoke(prompt, config=_usage_config()).content
     return {"research_brief": brief}
 
 
@@ -102,7 +112,8 @@ def outline_node(state: BlogState) -> dict:
     - 4-6 sections in logical narrative flow, each building on the previous.
     - Each section: a short title plus 3-5 concrete talking points (facts, examples, stats from the brief).
     - No full prose, bullets only."""
-    result = structured_llm.invoke(prompt)
+    with stage("outline"):
+        result = structured_llm.invoke(prompt, config=_usage_config())
     outline = [s.title.strip() for s in result.sections if s.title.strip()]
     sections = [
         {
@@ -142,7 +153,8 @@ def verify_outline_node(state: BlogState) -> dict:
     - Bullets are concrete and grounded in the brief (not filler)
 
     If any fail, approved=false with specific fixes (what to add/drop/merge/split)."""
-    verdict = critic.invoke(prompt)
+    with stage("verify_outline"):
+        verdict = critic.invoke(prompt, config=_usage_config())
     return {"outline_approved": verdict.approved, "outline_feedback": verdict.feedback}
 
 
@@ -176,22 +188,35 @@ def build_graph():
 
 
 def run_blog(query: str) -> dict:
-    app = build_graph()
-    return app.invoke(
-        {
-            "query": query,
-            "search_results": [],
-            "research_brief": "",
-            "research_approved": False,
-            "research_feedback": "",
-            "research_revisions": 0,
-            "outline": [],
-            "sections": [],
-            "outline_feedback": "",
-            "outline_revisions": 0,
-            "outline_approved": False,
-        }
-    )
+    final, _ = run_blog_with_usage(query)
+    return final
+
+
+def run_blog_with_usage(query: str) -> tuple[dict, list[dict]]:
+    """Run the pipeline, capturing per-LLM-call token usage.
+
+    Returns (final_state, usage_events). Events are plain dicts ready for
+    :func:`src.db.save_usage_events`.
+    """
+    collector = UsageCollector(query=query)
+    with collector:
+        app = build_graph()
+        final = app.invoke(
+            {
+                "query": query,
+                "search_results": [],
+                "research_brief": "",
+                "research_approved": False,
+                "research_feedback": "",
+                "research_revisions": 0,
+                "outline": [],
+                "sections": [],
+                "outline_feedback": "",
+                "outline_revisions": 0,
+                "outline_approved": False,
+            }
+        )
+    return final, collector.events
 
 
 def run_research(query: str) -> str:

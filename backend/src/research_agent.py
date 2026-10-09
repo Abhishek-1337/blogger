@@ -9,6 +9,14 @@ from pydantic import BaseModel, Field
 
 from src.schema import BlogState
 from src.tools import web_search
+from src.usage import get_active_collector, stage
+
+
+def _usage_config() -> dict:
+    collector = get_active_collector()
+    if collector is None:
+        return {}
+    return {"callbacks": collector.callbacks}
 
 load_dotenv()
 
@@ -88,7 +96,8 @@ Approve only if ALL hold:
 
 If any fail, approved=false with specific fixes (which angles are missing,
 what to re-search)."""
-    return critic.invoke(prompt)
+    with stage("verify_research"):
+        return critic.invoke(prompt, config=_usage_config())
 
 
 def verify_research_node(state: BlogState) -> dict:
@@ -109,16 +118,18 @@ def _run_research_pass(query: str, feedback: str) -> list[dict]:
         else ""
     )
     agent = create_agent(_llm(), tools, system_prompt=RESEARCH_PROMPT)
-    result = agent.invoke(
-        {
-            "messages": [
-                {
-                    "role": "user",
-                    "content": f"Research this topic: {query}{retry_block}",
-                }
-            ]
-        }
-    )
+    with stage("research"):
+        result = agent.invoke(
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": f"Research this topic: {query}{retry_block}",
+                    }
+                ]
+            },
+            config=_usage_config(),
+        )
 
     collected: list[dict] = []
     for m in result["messages"]:

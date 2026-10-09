@@ -2,14 +2,14 @@ import os
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from dotenv import load_dotenv
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
 
-from src.models import SearchEntry
+from src.models import LlmUsageEvent, SearchEntry, User
 
 load_dotenv()
 
@@ -114,6 +114,168 @@ async def list_search_entries(
         if user_id is not None:
             stmt = stmt.where(SearchEntry.user_id == user_id)
         result = await session.execute(stmt.limit(limit))
+        return list(result.scalars().all())
+
+
+async def save_usage_events(
+    events: list[dict],
+    user_id: int | None = None,
+    search_entry_id: int | None = None,
+) -> int:
+    """Persist one run's collected LLM usage events. Returns rows written."""
+    if not events:
+        return 0
+    async with SessionLocal() as session:
+        session.add_all(
+            [
+                LlmUsageEvent(
+                    user_id=user_id,
+                    search_entry_id=search_entry_id,
+                    query=str(e.get("query", ""))[:2000],
+                    stage=str(e.get("stage", ""))[:100],
+                    model=str(e.get("model", ""))[:100],
+                    prompt_tokens=int(e.get("prompt_tokens", 0) or 0),
+                    completion_tokens=int(e.get("completion_tokens", 0) or 0),
+                    total_tokens=int(e.get("total_tokens", 0) or 0),
+                    latency_ms=int(e.get("latency_ms", 0) or 0),
+                )
+                for e in events
+            ]
+        )
+        await session.commit()
+        return len(events)
+
+
+async def usage_totals(user_id: int | None = None) -> dict:
+    """Aggregate token totals, call counts, and per-stage / per-day splits.
+
+    ``user_id=None`` aggregates across all users (global dashboard).
+    """
+    async with SessionLocal() as session:
+        totals_stmt = select(
+            func.coalesce(func.sum(LlmUsageEvent.prompt_tokens), 0),
+            func.coalesce(func.sum(LlmUsageEvent.completion_tokens), 0),
+            func.coalesce(func.sum(LlmUsageEvent.total_tokens), 0),
+            func.count(LlmUsageEvent.id),
+            func.count(func.distinct(LlmUsageEvent.search_entry_id)),
+        )
+        by_stage_stmt = (
+            select(
+                LlmUsageEvent.stage,
+                func.count(LlmUsageEvent.id),
+                func.coalesce(func.sum(LlmUsageEvent.prompt_tokens), 0),
+                func.coalesce(func.sum(LlmUsageEvent.completion_tokens), 0),
+                func.coalesce(func.sum(LlmUsageEvent.total_tokens), 0),
+                func.coalesce(func.avg(LlmUsageEvent.latency_ms), 0),
+            )
+            .group_by(LlmUsageEvent.stage)
+            .order_by(func.sum(LlmUsageEvent.total_tokens).desc())
+        )
+        by_day_stmt = (
+            select(
+                func.date(LlmUsageEvent.created_at),
+                func.count(LlmUsageEvent.id),
+                func.coalesce(func.sum(LlmUsageEvent.total_tokens), 0),
+                func.count(func.distinct(LlmUsageEvent.search_entry_id)),
+            )
+            .group_by(func.date(LlmUsageEvent.created_at))
+            .order_by(func.date(LlmUsageEvent.created_at).desc())
+            .limit(14)
+        )
+        if user_id is not None:
+            scope = LlmUsageEvent.user_id == user_id
+            totals_stmt = totals_stmt.where(scope)
+            by_stage_stmt = by_stage_stmt.where(scope)
+            by_day_stmt = by_day_stmt.where(scope)
+        totals = (await session.execute(totals_stmt)).one()
+        by_stage = (await session.execute(by_stage_stmt)).all()
+        by_day = (await session.execute(by_day_stmt)).all()
+    return {
+        "prompt_tokens": int(totals[0]),
+        "completion_tokens": int(totals[1]),
+        "total_tokens": int(totals[2]),
+        "llm_calls": int(totals[3]),
+        "queries_tracked": int(totals[4]),
+        "by_stage": [
+            {
+                "stage": r[0] or "unknown",
+                "calls": int(r[1]),
+                "prompt_tokens": int(r[2]),
+                "completion_tokens": int(r[3]),
+                "total_tokens": int(r[4]),
+                "avg_latency_ms": int(r[5]),
+            }
+            for r in by_stage
+        ],
+        "by_day": [
+            {
+                "day": str(r[0]),
+                "calls": int(r[1]),
+                "total_tokens": int(r[2]),
+                "queries": int(r[3]),
+            }
+            for r in by_day
+        ],
+    }
+
+
+async def usage_per_query(
+    user_id: int | None = None, limit: int = 50
+) -> list[dict]:
+    """Newest-first per-query token rollups for the dashboard table.
+
+    ``user_id=None`` returns every user's queries (global dashboard).
+    """
+    async with SessionLocal() as session:
+        stmt = (
+            select(
+                SearchEntry.id,
+                SearchEntry.query,
+                SearchEntry.created_at,
+                func.count(LlmUsageEvent.id),
+                func.coalesce(func.sum(LlmUsageEvent.prompt_tokens), 0),
+                func.coalesce(func.sum(LlmUsageEvent.completion_tokens), 0),
+                func.coalesce(func.sum(LlmUsageEvent.total_tokens), 0),
+                func.coalesce(User.email, ""),
+            )
+            .outerjoin(
+                LlmUsageEvent,
+                LlmUsageEvent.search_entry_id == SearchEntry.id,
+            )
+            .outerjoin(User, User.id == SearchEntry.user_id)
+            .group_by(SearchEntry.id, User.email)
+            .order_by(desc(SearchEntry.created_at), desc(SearchEntry.id))
+            .limit(limit)
+        )
+        if user_id is not None:
+            stmt = stmt.where(SearchEntry.user_id == user_id)
+        rows = (await session.execute(stmt)).all()
+    return [
+        {
+            "id": r[0],
+            "query": r[1],
+            "created_at": r[2].isoformat() if r[2] else "",
+            "calls": int(r[3]),
+            "prompt_tokens": int(r[4]),
+            "completion_tokens": int(r[5]),
+            "total_tokens": int(r[6]),
+            "user_email": r[7] or "",
+        }
+        for r in rows
+    ]
+
+
+async def usage_for_entry(entry_id: int, user_id: int) -> list[LlmUsageEvent]:
+    """Per-LLM-call usage rows for one stored query (owner-scoped)."""
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(LlmUsageEvent)
+            .where(
+                LlmUsageEvent.search_entry_id == entry_id,
+                LlmUsageEvent.user_id == user_id,
+            )
+            .order_by(LlmUsageEvent.id)
+        )
         return list(result.scalars().all())
 
 

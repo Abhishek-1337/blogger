@@ -1,4 +1,12 @@
-import type { BlogResponse, LoginResponse, SearchSummary, User } from "./types";
+import type {
+  BlogResponse,
+  LoginResponse,
+  SearchSummary,
+  UsageCall,
+  UsageQueryRow,
+  UsageSummary,
+  User,
+} from "./types";
 
 interface ErrorBody {
   detail?: string | Array<{ msg?: string }>;
@@ -105,4 +113,58 @@ export async function fetchSearch(
     throw new Error(await readError(res, `Request failed (${res.status}).`));
   }
   return (await res.json()) as BlogResponse;
+}
+
+export async function fetchUsageSummary(
+  apiUrl: string,
+  token: string
+): Promise<UsageSummary> {
+  const res = await fetch(`${apiUrl}/usage/summary`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    throw new Error(await readError(res, `Request failed (${res.status}).`));
+  }
+  return (await res.json()) as UsageSummary;
+}
+
+export async function fetchUsageOverview(
+  apiUrl: string,
+  token: string
+): Promise<UsageSummary> {
+  const res = await fetch(`${apiUrl}/usage/overview`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    throw new Error(await readError(res, `Request failed (${res.status}).`));
+  }
+  return (await res.json()) as UsageSummary;
+}
+
+export async function fetchUsageRecent(
+  apiUrl: string,
+  token: string,
+  limit = 50
+): Promise<UsageQueryRow[]> {
+  const res = await fetch(`${apiUrl}/usage/recent?limit=${limit}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    throw new Error(await readError(res, `Request failed (${res.status}).`));
+  }
+  return (await res.json()) as UsageQueryRow[];
+}
+
+export async function fetchEntryUsage(
+  apiUrl: string,
+  id: number,
+  token: string
+): Promise<UsageCall[]> {
+  const res = await fetch(`${apiUrl}/searches/${id}/usage`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    throw new Error(await readError(res, `Request failed (${res.status}).`));
+  }
+  return (await res.json()) as UsageCall[];
 }

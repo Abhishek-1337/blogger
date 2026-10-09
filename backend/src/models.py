@@ -23,6 +23,30 @@ class User(Base):
     )
 
 
+class LlmUsageEvent(Base):
+    """One LLM call's token usage, linked to a query and user when known."""
+
+    __tablename__ = "llm_usage_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
+    search_entry_id: Mapped[int | None] = mapped_column(
+        ForeignKey("search_entries.id"), nullable=True, index=True
+    )
+    query: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    stage: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    model: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    latency_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+
 class SearchEntry(Base):
     """One stored blog search and its generated result."""
 
