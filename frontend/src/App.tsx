@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fetchBlog, fetchEntryUsage, fetchSearch, fetchSearches } from "./api";
+import { fetchBlog, fetchSearch, fetchSearches } from "./api";
 import { AuthProvider, GoogleSignInButton, useAuth } from "./auth";
-import type { BlogResponse, SearchSummary, UsageCall } from "./types";
+import type { BlogResponse, SearchSummary } from "./types";
 import Composer from "./components/Composer";
 import Header from "./components/Header";
 import History from "./components/History";
 import Outline from "./components/Outline";
 import ProgressPill from "./components/ProgressPill";
-import QueryUsage from "./components/QueryUsage";
 import ResearchBrief from "./components/ResearchBrief";
-import UsageDashboard from "./components/UsageDashboard";
 import Verdict from "./components/Verdict";
 
 const API_URL = import.meta.env.VITE_API_URL ?? "";
@@ -56,9 +54,6 @@ function Workspace() {
   const [selectingId, setSelectingId] = useState<number | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [view, setView] = useState<"create" | "usage">("create");
-  const [entryUsage, setEntryUsage] = useState<UsageCall[] | null>(null);
-  const [usageLoading, setUsageLoading] = useState(false);
   const resultsRef = useRef<HTMLElement>(null);
 
   const loadHistory = useCallback(async () => {
@@ -103,7 +98,6 @@ function Workspace() {
   function newSearch() {
     setQuery("");
     setResult(null);
-    setEntryUsage(null);
     setSelectedId(null);
     setError("");
     setSidebarOpen(false);
@@ -121,7 +115,6 @@ function Workspace() {
     }
     setError("");
     setResult(null);
-    setEntryUsage(null);
     setSelectedId(null);
     setActiveStage(0);
     setBusy(true);
@@ -129,8 +122,6 @@ function Workspace() {
       const data = await fetchBlog(topic, API_URL, token);
       setResult(data);
       setSelectedId(data.id ?? null);
-      // Fresh generations carry their usage inline; clear any history usage.
-      setEntryUsage(null);
       void loadHistory();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -143,23 +134,15 @@ function Workspace() {
     if (!token) return;
     setError("");
     setSelectingId(id);
-    setUsageLoading(true);
     try {
       const data = await fetchSearch(API_URL, id, token);
       setResult(data);
       setSelectedId(data.id ?? id);
       setSidebarOpen(false);
-      setView("create");
-      try {
-        setEntryUsage(await fetchEntryUsage(API_URL, id, token));
-      } catch {
-        setEntryUsage(null);
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setSelectingId(null);
-      setUsageLoading(false);
     }
   }
 
@@ -178,56 +161,22 @@ function Workspace() {
 
   return (
     <Shell onMenu={() => setSidebarOpen(true)} onSignOut={signOut} newSearch={newSearch} sidebarBody={sidebarBody} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen}>
-      <div role="tablist" aria-label="Workspace views" className="mb-5 flex gap-1 rounded-xl border border-line bg-white p-1 shadow-sm dark:border-white/10 dark:bg-panel">
-        {(["create", "usage"] as const).map((v) => (
-          <button
-            key={v}
-            type="button"
-            role="tab"
-            aria-selected={view === v}
-            onClick={() => setView(v)}
-            className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-              view === v
-                ? "bg-pine text-white dark:bg-sage dark:text-[#0b1511]"
-                : "text-fog hover:bg-wash/70 dark:hover:bg-white/[0.06]"
-            }`}
-          >
-            {v === "create" ? "Create" : "Token usage"}
-          </button>
-        ))}
-      </div>
+      <Composer
+        query={query}
+        busy={busy}
+        error={error}
+        onQueryChange={setQuery}
+        onSubmit={generate}
+      />
 
-      {view === "usage" ? (
-        token ? (
-          <UsageDashboard apiUrl={API_URL} token={token} />
-        ) : (
-          <p className="text-sm text-fog">Please sign in again.</p>
-        )
-      ) : (
-        <>
-          <Composer
-            query={query}
-            busy={busy}
-            error={error}
-            onQueryChange={setQuery}
-            onSubmit={generate}
-          />
+      {busy && <ProgressPill stage={STAGES[activeStage]} />}
 
-          {busy && <ProgressPill stage={STAGES[activeStage]} />}
-
-          {result && (
-            <section ref={resultsRef} className="mt-8 scroll-mt-4">
-              <Verdict data={result} />
-              <QueryUsage
-                block={result.usage ?? null}
-                calls={result.usage ? null : entryUsage}
-                loading={usageLoading}
-              />
-              <ResearchBrief brief={result.research_brief} />
-              <Outline sections={result.sections || []} />
-            </section>
-          )}
-        </>
+      {result && (
+        <section ref={resultsRef} className="mt-8 scroll-mt-4">
+          <Verdict data={result} />
+          <ResearchBrief brief={result.research_brief} />
+          <Outline sections={result.sections || []} />
+        </section>
       )}
     </Shell>
   );
