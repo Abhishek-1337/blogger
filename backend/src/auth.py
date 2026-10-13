@@ -107,6 +107,25 @@ async def get_or_create_user(session: AsyncSession, claims: dict) -> User:
     return user
 
 
+def admin_emails() -> set[str]:
+    """Lowercased allowlist from the ADMIN_EMAILS env var (comma-separated)."""
+    raw = os.getenv("ADMIN_EMAILS", "")
+    return {e.strip().lower() for e in raw.split(",") if e.strip()}
+
+
+def is_admin(user: User) -> bool:
+    """True when the user may see token/cost observability.
+
+    When ADMIN_EMAILS is unset, any signed-in user counts as admin so a
+    fresh deploy works out of the box. Set ADMIN_EMAILS in production to
+    restrict the admin observability app to your team.
+    """
+    allow = admin_emails()
+    if not allow:
+        return True
+    return (user.email or "").strip().lower() in allow
+
+
 async def get_current_user(
     creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> User:
@@ -125,5 +144,17 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Account no longer exists. Please sign in again.",
+        )
+    return user
+
+
+async def get_admin_user(
+    user: User = Depends(get_current_user),
+) -> User:
+    """FastAPI dependency: the JWT-authenticated admin user, else 403."""
+    if not is_admin(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required.",
         )
     return user

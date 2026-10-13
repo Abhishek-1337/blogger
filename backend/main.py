@@ -7,8 +7,10 @@ from pydantic import BaseModel, Field
 
 from src.auth import (
     create_access_token,
+    get_admin_user,
     get_current_user,
     get_or_create_user,
+    is_admin,
     verify_google_token,
 )
 from src.db import (
@@ -17,7 +19,7 @@ from src.db import (
     list_search_entries,
     save_search_entry,
     save_usage_events,
-    usage_for_entry,
+    usage_for_entry_any,
     usage_per_query,
     usage_totals,
 )
@@ -250,8 +252,8 @@ async def _build_usage_summary(user_id: int | None, recent_limit: int) -> UsageS
 
 
 @app.get("/usage/summary", response_model=UsageSummaryOut)
-async def get_usage_summary(user: User = Depends(get_current_user)):
-    """Dashboard aggregates for the signed-in user."""
+async def get_usage_summary(user: User = Depends(get_admin_user)):
+    """Dashboard aggregates for the signed-in admin (own queries)."""
     try:
         return await _build_usage_summary(user.id, recent_limit=10)
     except ValueError as e:
@@ -259,12 +261,8 @@ async def get_usage_summary(user: User = Depends(get_current_user)):
 
 
 @app.get("/usage/overview", response_model=UsageSummaryOut)
-async def get_usage_overview(user: User = Depends(get_current_user)):
-    """Global dashboard: every user's queries in one place.
-
-    Still requires login; per-admin restriction is intentionally deferred
-    until admin auth is added.
-    """
+async def get_usage_overview(user: User = Depends(get_admin_user)):
+    """Global dashboard: every user's queries in one place (admin only)."""
     try:
         return await _build_usage_summary(None, recent_limit=50)
     except ValueError as e:
@@ -273,9 +271,9 @@ async def get_usage_overview(user: User = Depends(get_current_user)):
 
 @app.get("/usage/recent", response_model=list[UsageQueryRowOut])
 async def get_usage_recent(
-    limit: int = 50, user: User = Depends(get_current_user)
+    limit: int = 50, user: User = Depends(get_admin_user)
 ):
-    """Per-query token rollup (newest first) for the dashboard table."""
+    """Per-query token rollup (newest first) for the admin (own queries)."""
     try:
         rows = await usage_per_query(user.id, min(max(limit, 1), 200))
     except ValueError as e:
@@ -289,32 +287,82 @@ async def get_usage_recent(
     ]
 
 
+def _to_usage_call_out(e) -> UsageCallOut:
+    return UsageCallOut(
+        id=e.id,
+        stage=e.stage or "unknown",
+        model=e.model or "gpt-4o-mini",
+        prompt_tokens=e.prompt_tokens,
+        completion_tokens=e.completion_tokens,
+        total_tokens=e.total_tokens,
+        latency_ms=e.latency_ms,
+        created_at=e.created_at,
+    )
+
+
 @app.get("/searches/{entry_id}/usage", response_model=list[UsageCallOut])
-async def get_search_usage(entry_id: int, user: User = Depends(get_current_user)):
-    """Per-LLM-call token breakdown for one stored query."""
+async def get_search_usage(entry_id: int, user: User = Depends(get_admin_user)):
+    """Per-LLM-call token breakdown for one stored query (admin only)."""
     try:
-        entry = await get_search_entry(entry_id, user.id)
+        entry = await get_search_entry(entry_id)
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
     if entry is None:
         raise HTTPException(status_code=404, detail="Search not found.")
     try:
-        events = await usage_for_entry(entry_id, user.id)
+        events = await usage_for_entry_any(entry_id)
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return [_to_usage_call_out(e) for e in events]
+
+
+# -- Admin observability API (stable contract for the separately-deployed ----
+# -- admin frontend; same DB and backend, admin login required) --------------
+
+
+@app.get("/admin/usage/summary", response_model=UsageSummaryOut)
+async def get_admin_usage_summary(user: User = Depends(get_admin_user)):
+    """Global token/cost aggregates across all users (admin only)."""
+    try:
+        return await _build_usage_summary(None, recent_limit=50)
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/admin/usage/recent", response_model=list[UsageQueryRowOut])
+async def get_admin_usage_recent(
+    limit: int = 50, user: User = Depends(get_admin_user)
+):
+    """Global per-query token rollup, newest first (admin only)."""
+    try:
+        rows = await usage_per_query(None, min(max(limit, 1), 200))
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
     return [
-        UsageCallOut(
-            id=e.id,
-            stage=e.stage or "unknown",
-            model=e.model or "gpt-4o-mini",
-            prompt_tokens=e.prompt_tokens,
-            completion_tokens=e.completion_tokens,
-            total_tokens=e.total_tokens,
-            latency_ms=e.latency_ms,
-            created_at=e.created_at,
+        UsageQueryRowOut(
+            **r,
+            est_cost_usd=_row_cost_usd(r["prompt_tokens"], r["completion_tokens"]),
         )
-        for e in events
+        for r in rows
     ]
+
+
+@app.get("/admin/searches/{entry_id}/usage", response_model=list[UsageCallOut])
+async def get_admin_search_usage(
+    entry_id: int, user: User = Depends(get_admin_user)
+):
+    """Per-LLM-call token breakdown for any stored query (admin only)."""
+    try:
+        entry = await get_search_entry(entry_id)
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Search not found.")
+    try:
+        events = await usage_for_entry_any(entry_id)
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return [_to_usage_call_out(e) for e in events]
 
 
 @app.get("/searches/{entry_id}", response_model=BlogResponse)
@@ -363,13 +411,16 @@ async def generate_blog(req: BlogRequest, user: User = Depends(get_current_user)
         await save_usage_events(usage_events, user.id, entry_id)
     except Exception as e:
         print(f"Warning: failed to persist usage events: {e}")
-    usage_block = UsageBlockOut(
-        **{
-            k: v
-            for k, v in _collector_summary(usage_events).items()
-            if k in UsageBlockOut.model_fields
-        }
-    )
+    # Token/cost data is admin-only: regular users get no usage block.
+    usage_block = None
+    if is_admin(user):
+        usage_block = UsageBlockOut(
+            **{
+                k: v
+                for k, v in _collector_summary(usage_events).items()
+                if k in UsageBlockOut.model_fields
+            }
+        )
     return BlogResponseWithUsage(
         id=entry_id,
         query=query,

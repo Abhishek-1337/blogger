@@ -279,6 +279,17 @@ async def usage_for_entry(entry_id: int, user_id: int) -> list[LlmUsageEvent]:
         return list(result.scalars().all())
 
 
+async def usage_for_entry_any(entry_id: int) -> list[LlmUsageEvent]:
+    """Per-LLM-call usage rows for one stored query (any owner; admin use)."""
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(LlmUsageEvent)
+            .where(LlmUsageEvent.search_entry_id == entry_id)
+            .order_by(LlmUsageEvent.id)
+        )
+        return list(result.scalars().all())
+
+
 async def get_search_entry(
     entry_id: int, user_id: int | None = None
 ) -> SearchEntry | None:
