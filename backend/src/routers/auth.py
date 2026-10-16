@@ -10,7 +10,9 @@ from src.auth import (
 from src.db import SessionLocal
 from src.models import User
 
-from .shared import GoogleLoginRequest, LoginResponse, UserOut, to_user_out
+from src.types import GoogleLoginRequest, LoginResponse, UserOut
+
+from .shared import to_user_out
 
 router = APIRouter()
 

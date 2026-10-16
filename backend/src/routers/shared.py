@@ -1,10 +1,12 @@
-"""Shared web-layer pieces: response models, converters, and error mapping."""
+"""Shared web-layer helpers: converters, cost math, and error mapping.
+
+Response/request types live in :mod:`src.types`, grouped by the routes
+that use them (auth, blog, usage).
+"""
 
 import functools
-from datetime import datetime
 
 from fastapi import HTTPException
-from pydantic import BaseModel, Field
 
 from src.db import (
     get_search_entry,
@@ -13,6 +15,17 @@ from src.db import (
     usage_totals,
 )
 from src.models import SearchEntry, User
+from src.types import (
+    UsageBlockOut,
+    UsageCallOut,
+    UsageQueryRowOut,
+    UsageStageOut,
+    UsageSummaryOut,
+    UsageDayOut,
+    UsageTotalsOut,
+    UserOut,
+    BlogResponse,
+)
 from src.usage import PRICING_PER_1M, UsageCollector, estimate_cost_usd
 
 
@@ -31,121 +44,6 @@ def db_errors(fn):
             raise HTTPException(status_code=500, detail=str(e))
 
     return wrapper
-
-
-class OutlineSectionOut(BaseModel):
-    title: str
-    bullets: list[str]
-
-
-class BlogResponse(BaseModel):
-    id: int | None = None
-    query: str
-    research_brief: str
-    outline: list[str]
-    sections: list[OutlineSectionOut]
-    outline_approved: bool
-    outline_revisions: int
-    outline_feedback: str
-
-
-class UsageStageOut(BaseModel):
-    stage: str
-    calls: int
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
-    latency_ms: int = 0
-    avg_latency_ms: int = 0
-
-
-class UsageBlockOut(BaseModel):
-    calls: int
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
-    est_cost_usd: float
-    by_stage: list[UsageStageOut] = []
-
-
-class BlogResponseWithUsage(BlogResponse):
-    usage: UsageBlockOut | None = None
-
-
-class UserOut(BaseModel):
-    id: int
-    email: str
-    name: str
-    picture: str
-
-
-class SearchSummaryOut(BaseModel):
-    id: int
-    query: str
-    created_at: datetime
-    outline_approved: bool
-
-
-class UsageCallOut(BaseModel):
-    id: int
-    stage: str
-    model: str
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
-    latency_ms: int
-    created_at: datetime
-
-
-class UsageQueryRowOut(BaseModel):
-    id: int
-    query: str
-    created_at: str
-    calls: int
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
-    est_cost_usd: float
-    user_email: str = ""
-
-
-class UsageTotalsOut(BaseModel):
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
-    llm_calls: int
-    queries_tracked: int
-    avg_tokens_per_query: float
-    est_cost_usd: float
-
-
-class UsageDayOut(BaseModel):
-    day: str
-    calls: int
-    total_tokens: int
-    queries: int
-
-
-class UsageSummaryOut(BaseModel):
-    totals: UsageTotalsOut
-    by_stage: list[UsageStageOut]
-    by_day: list[UsageDayOut]
-    recent: list[UsageQueryRowOut]
-    pricing_per_1m_usd: dict[str, dict[str, float]]
-    pricing_note: str
-
-
-class GoogleLoginRequest(BaseModel):
-    id_token: str = Field(min_length=1, description="Google ID token from GIS")
-
-
-class LoginResponse(BaseModel):
-    token: str
-    user: UserOut
-
-
-class BlogRequest(BaseModel):
-    query: str = Field(min_length=1, description="Blog topic / user query")
 
 
 def to_user_out(user: User) -> UserOut:

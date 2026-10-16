@@ -8,10 +8,9 @@ from fastapi import APIRouter, Depends
 from src.auth import get_admin_user
 from src.models import User
 
+from src.types import UsageCallOut, UsageQueryRowOut, UsageSummaryOut
+
 from .shared import (
-    UsageCallOut,
-    UsageQueryRowOut,
-    UsageSummaryOut,
     build_usage_summary,
     db_errors,
     entry_usage_calls,
