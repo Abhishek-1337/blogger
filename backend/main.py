@@ -1,5 +1,3 @@
-"""Blogger API composition root: app, middleware, and router wiring."""
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 

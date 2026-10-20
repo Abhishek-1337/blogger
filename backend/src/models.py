@@ -9,8 +9,6 @@ class Base(DeclarativeBase):
 
 
 class User(Base):
-    """One Google-authenticated user."""
-
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -24,8 +22,6 @@ class User(Base):
 
 
 class LlmUsageEvent(Base):
-    """One LLM call's token usage, linked to a query and user when known."""
-
     __tablename__ = "llm_usage_events"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -48,8 +44,6 @@ class LlmUsageEvent(Base):
 
 
 class SearchEntry(Base):
-    """One stored blog search and its generated result."""
-
     __tablename__ = "search_entries"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

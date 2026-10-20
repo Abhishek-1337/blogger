@@ -1,7 +1,6 @@
-"""Blog routes: generation plus stored-search reads."""
-
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.concurrency import run_in_threadpool
+
 from src.auth import get_current_user, is_admin
 from src.db import (
     get_search_entry,
@@ -11,20 +10,14 @@ from src.db import (
 )
 from src.graph import run_blog_with_usage
 from src.models import User
-
 from src.types import (
     BlogRequest,
     BlogResponse,
     BlogResponseWithUsage,
     SearchSummaryOut,
-    UsageBlockOut,
 )
 
-from .shared import (
-    db_errors,
-    summarize_collector_events,
-    to_blog_response,
-)
+from .shared import db_errors, summarize_events, to_blog_response
 
 router = APIRouter()
 
@@ -65,9 +58,13 @@ async def generate_blog(req: BlogRequest, user: User = Depends(get_current_user)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Blog generation failed: {e}")
 
-    feedback = final.get("outline_feedback", "") or (
-        "Outline approved." if final.get("outline_approved") else ""
-    )
+    if final.get("outline_feedback"):
+        feedback = final["outline_feedback"]
+    elif final.get("outline_approved"):
+        feedback = "Outline approved."
+    else:
+        feedback = ""
+
     try:
         entry_id = await save_search_entry(
             {
@@ -88,16 +85,8 @@ async def generate_blog(req: BlogRequest, user: User = Depends(get_current_user)
         await save_usage_events(usage_events, user.id, entry_id)
     except Exception as e:
         print(f"Warning: failed to persist usage events: {e}")
-    # Token/cost data is admin-only: regular users get no usage block.
-    usage_block = None
-    if is_admin(user):
-        usage_block = UsageBlockOut(
-            **{
-                k: v
-                for k, v in summarize_collector_events(usage_events).items()
-                if k in UsageBlockOut.model_fields
-            }
-        )
+
+    usage = summarize_events(usage_events) if is_admin(user) else None
     return BlogResponseWithUsage(
         id=entry_id,
         query=query,
@@ -107,5 +96,5 @@ async def generate_blog(req: BlogRequest, user: User = Depends(get_current_user)
         outline_approved=final.get("outline_approved", False),
         outline_revisions=final.get("outline_revisions", 0),
         outline_feedback=feedback,
-        usage=usage_block,
+        usage=usage,
     )

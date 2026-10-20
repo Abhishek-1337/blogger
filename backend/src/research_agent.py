@@ -2,21 +2,14 @@ import json
 import os
 
 from dotenv import load_dotenv
+from langchain.agents import create_agent
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
-from langchain.agents import create_agent
 from pydantic import BaseModel, Field
 
 from src.schema import BlogState
 from src.tools import web_search
-from src.usage import get_active_collector, stage
-
-
-def _usage_config() -> dict:
-    collector = get_active_collector()
-    if collector is None:
-        return {}
-    return {"callbacks": collector.callbacks}
+from src.usage import callback_config, stage
 
 load_dotenv()
 
@@ -41,14 +34,7 @@ def _llm(temperature: float = 0.3) -> ChatOpenAI:
 
 @tool
 def search_web(query: str, max_results: int = 5) -> str:
-    """Search the live web for one focused angle of the topic.
-
-    Args:
-        query: A specific search query, e.g. "urban composting odor control".
-        max_results: How many hits to return (3-8 is plenty per angle).
-
-    Returns a JSON list of {"title", "url", "snippet"} objects.
-    """
+    """Search the live web for one focused angle of the topic."""
     return json.dumps(web_search(query, max_results=max_results))
 
 
@@ -56,18 +42,17 @@ tools = [search_web]
 
 
 def _dedupe(results: list[dict], limit: int = MAX_RESULTS) -> list[dict]:
-    seen, deduped = set(), []
+    seen = set()
+    unique = []
     for r in results:
         url = r.get("url", "")
         if url and url not in seen:
             seen.add(url)
-            deduped.append(r)
-    return deduped[:limit]
+            unique.append(r)
+    return unique[:limit]
 
 
 class ResearchVerdict(BaseModel):
-    """LLM critique of the collected evidence: good enough or re-search."""
-
     approved: bool = Field(description="True if the evidence is good enough to keep")
     feedback: str = Field(
         default="",
@@ -76,7 +61,6 @@ class ResearchVerdict(BaseModel):
 
 
 def _verify_results(query: str, search_results: list[dict]) -> ResearchVerdict:
-    """Critic pass over collected evidence: approve or request more angles."""
     critic = _llm(0.2).with_structured_output(ResearchVerdict)
     evidence = "\n".join(
         f"{i}. {r.get('title', '')} ({r.get('url', '')}): "
@@ -97,39 +81,19 @@ Approve only if ALL hold:
 If any fail, approved=false with specific fixes (which angles are missing,
 what to re-search)."""
     with stage("verify_research"):
-        return critic.invoke(prompt, config=_usage_config())
-
-
-def verify_research_node(state: BlogState) -> dict:
-    """Graph-compat wrapper; the live loop now lives in research_agent_node."""
-    verdict = _verify_results(state["query"], state["search_results"])
-    return {
-        "research_approved": verdict.approved,
-        "research_feedback": verdict.feedback,
-    }
+        return critic.invoke(prompt, config=callback_config())
 
 
 def _run_research_pass(query: str, feedback: str) -> list[dict]:
-    """One agent pass; returns raw collected result dicts."""
-    retry_block = (
-        "\nA previous attempt was rejected — adjust your searches accordingly:\n"
-        f"Critic feedback: {feedback}"
-        if feedback
-        else ""
-    )
+    content = f"Research this topic: {query}"
+    if feedback:
+        content += (
+            "\nA previous attempt was rejected — adjust your searches accordingly:\n"
+            f"Critic feedback: {feedback}"
+        )
     agent = create_agent(_llm(), tools, system_prompt=RESEARCH_PROMPT)
     with stage("research"):
-        result = agent.invoke(
-            {
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": f"Research this topic: {query}{retry_block}",
-                    }
-                ]
-            },
-            config=_usage_config(),
-        )
+        result = agent.invoke({"messages": [{"role": "user", "content": content}]}, config=callback_config())
 
     collected: list[dict] = []
     for m in result["messages"]:
@@ -143,18 +107,11 @@ def _run_research_pass(query: str, feedback: str) -> list[dict]:
             collected.extend(r for r in payload if isinstance(r, dict))
 
     if not collected:
-        # Agent answered without searching — never starve the pipeline.
         collected = web_search(query, max_results=MAX_RESULTS)
     return collected
 
 
 def research_agent_node(state: BlogState) -> dict:
-    """Research with an internal verify-and-retry loop.
-
-    Negative critic feedback feeds back into the next search pass, and
-    evidence accumulates across passes so a retry adds angles instead of
-    discarding the first pass.
-    """
     revisions = state.get("research_revisions", 0) or 0
     feedback = state.get("research_feedback", "") or ""
     accumulated: list[dict] = list(state.get("search_results", []) or [])

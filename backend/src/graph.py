@@ -1,30 +1,21 @@
 import os
-from pydantic import BaseModel, Field
 
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, StateGraph
+from pydantic import BaseModel, Field
 
 from src.research_agent import research_agent_node
 from src.schema import BlogState
-from src.usage import UsageCollector, get_active_collector, stage
-
-
-def _usage_config() -> dict:
-    """LangChain config routing every LLM call to the active collector."""
-    collector = get_active_collector()
-    if collector is None:
-        return {}
-    return {"callbacks": collector.callbacks}
+from src.usage import UsageCollector, callback_config, stage
 
 load_dotenv()
 
 MODEL = "gpt-4o-mini"
 MAX_OUTLINE_REVISIONS = 2
 
-class OutlineSection(BaseModel):
-    """One blog section: title plus writer's talking points."""
 
+class OutlineSection(BaseModel):
     title: str = Field(description="Section title, no numbering, no description")
     bullets: list[str] = Field(
         min_length=3,
@@ -34,8 +25,6 @@ class OutlineSection(BaseModel):
 
 
 class BlogOutline(BaseModel):
-    """Structured outline: 4-6 sections, each with bullets."""
-
     sections: list[OutlineSection] = Field(
         min_length=4,
         max_length=6,
@@ -44,8 +33,6 @@ class BlogOutline(BaseModel):
 
 
 class OutlineVerdict(BaseModel):
-    """LLM critique of the outline: approve or request a rewrite."""
-
     approved: bool = Field(description="True if the outline is good enough to keep")
     feedback: str = Field(
         default="",
@@ -79,7 +66,7 @@ def summarize_node(state: BlogState) -> dict:
 
     Keep it factual, cite only from the evidence above."""
     with stage("summarize"):
-        brief = llm.invoke(prompt, config=_usage_config()).content
+        brief = llm.invoke(prompt, config=callback_config()).content
     return {"research_brief": brief}
 
 
@@ -87,22 +74,20 @@ def outline_node(state: BlogState) -> dict:
     structured_llm = _llm(0.7).with_structured_output(BlogOutline)
     feedback = state.get("outline_feedback", "") or ""
     revisions = state.get("outline_revisions", 0) or 0
-    previous = ""
-    if state.get("sections"):
+
+    retry_block = ""
+    if feedback:
         previous = "\n".join(
             f"- {s.get('title', '')}: {'; '.join(s.get('bullets', []))}"
             for s in state["sections"]
         )
-    retry_block = (
-        f"""
+        retry_block = f"""
     Previous attempt (revise, don't repeat its mistakes):
     {previous}
 
     Critic feedback to fix:
     {feedback}"""
-        if feedback
-        else ""
-    )
+
     prompt = f"""Based on this research brief, create a blog outline of 4-6 sections.
 
     Research brief:
@@ -113,7 +98,7 @@ def outline_node(state: BlogState) -> dict:
     - Each section: a short title plus 3-5 concrete talking points (facts, examples, stats from the brief).
     - No full prose, bullets only."""
     with stage("outline"):
-        result = structured_llm.invoke(prompt, config=_usage_config())
+        result = structured_llm.invoke(prompt, config=callback_config())
     outline = [s.title.strip() for s in result.sections if s.title.strip()]
     sections = [
         {
@@ -139,7 +124,7 @@ def verify_outline_node(state: BlogState) -> dict:
         + "\n".join(f"   - {b}" for b in s.get("bullets", []))
         for i, s in enumerate(state["sections"], 1)
     )
-    prompt = f"""You are a strict expertq blog editor. Topic: "{state['query']}"
+    prompt = f"""You are a strict expert blog editor. Topic: "{state['query']}"
 
     Research brief:
     {state['research_brief']}
@@ -154,7 +139,7 @@ def verify_outline_node(state: BlogState) -> dict:
 
     If any fail, approved=false with specific fixes (what to add/drop/merge/split)."""
     with stage("verify_outline"):
-        verdict = critic.invoke(prompt, config=_usage_config())
+        verdict = critic.invoke(prompt, config=callback_config())
     return {"outline_approved": verdict.approved, "outline_feedback": verdict.feedback}
 
 
@@ -168,36 +153,21 @@ def _should_retry_outline(state: BlogState) -> str:
 
 def build_graph():
     graph = StateGraph(BlogState)
-
     graph.add_node("research", research_agent_node)
     graph.add_node("summarize", summarize_node)
     graph.add_node("outline", outline_node)
     graph.add_node("verify_outline", verify_outline_node)
-
     graph.set_entry_point("research")
-
     graph.add_edge("research", "summarize")
     graph.add_edge("summarize", "outline")
     graph.add_edge("outline", "verify_outline")
-
     graph.add_conditional_edges(
         "verify_outline", _should_retry_outline, {"outline": "outline", END: END}
     )
-
     return graph.compile()
 
 
-def run_blog(query: str) -> dict:
-    final, _ = run_blog_with_usage(query)
-    return final
-
-
 def run_blog_with_usage(query: str) -> tuple[dict, list[dict]]:
-    """Run the pipeline, capturing per-LLM-call token usage.
-
-    Returns (final_state, usage_events). Events are plain dicts ready for
-    :func:`src.db.save_usage_events`.
-    """
     collector = UsageCollector(query=query)
     with collector:
         app = build_graph()
@@ -217,7 +187,3 @@ def run_blog_with_usage(query: str) -> tuple[dict, list[dict]]:
             }
         )
     return final, collector.events
-
-
-def run_research(query: str) -> str:
-    return run_blog(query)["research_brief"]

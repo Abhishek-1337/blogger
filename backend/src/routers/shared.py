@@ -1,9 +1,3 @@
-"""Shared web-layer helpers: converters, cost math, and error mapping.
-
-Response/request types live in :mod:`src.types`, grouped by the routes
-that use them (auth, blog, usage).
-"""
-
 import functools
 
 from fastapi import HTTPException
@@ -16,26 +10,20 @@ from src.db import (
 )
 from src.models import SearchEntry, User
 from src.types import (
+    BlogResponse,
     UsageBlockOut,
     UsageCallOut,
+    UsageDayOut,
     UsageQueryRowOut,
     UsageStageOut,
     UsageSummaryOut,
-    UsageDayOut,
     UsageTotalsOut,
     UserOut,
-    BlogResponse,
 )
 from src.usage import PRICING_PER_1M, UsageCollector, estimate_cost_usd
 
 
 def db_errors(fn):
-    """Map ValueError from the DB layer to HTTP 500.
-
-    Every handler previously repeated the same try/except; one decorator
-    preserves that behavior. HTTPException (e.g. 404s) passes through.
-    """
-
     @functools.wraps(fn)
     async def wrapper(*args, **kwargs):
         try:
@@ -47,9 +35,7 @@ def db_errors(fn):
 
 
 def to_user_out(user: User) -> UserOut:
-    return UserOut(
-        id=user.id, email=user.email, name=user.name, picture=user.picture
-    )
+    return UserOut(id=user.id, email=user.email, name=user.name, picture=user.picture)
 
 
 def to_blog_response(entry: SearchEntry) -> BlogResponse:
@@ -78,24 +64,17 @@ def to_usage_call_out(e) -> UsageCallOut:
     )
 
 
-def row_cost_usd(prompt_tokens: int, completion_tokens: int) -> float:
+def cost_usd(prompt_tokens: int, completion_tokens: int) -> float:
     return round(estimate_cost_usd("gpt-4o-mini", prompt_tokens, completion_tokens), 6)
 
 
-def summarize_collector_events(events: list[dict]) -> dict:
-    """Summarize raw collector events into a UsageBlockOut-compatible dict."""
+def summarize_events(events: list[dict]) -> UsageBlockOut:
     collector = UsageCollector()
     collector.events = events
-    return collector.summary()
+    return UsageBlockOut(**collector.summary())
 
 
-async def build_usage_summary(
-    user_id: int | None, recent_limit: int
-) -> UsageSummaryOut:
-    """Assemble the dashboard payload, optionally scoped to one user.
-
-    ``user_id=None`` aggregates every user's queries (global dashboard).
-    """
+async def build_usage_summary(user_id: int | None, recent_limit: int) -> UsageSummaryOut:
     totals = await usage_totals(user_id)
     recent = await usage_per_query(user_id, limit=recent_limit)
     tracked = totals["queries_tracked"]
@@ -106,19 +85,15 @@ async def build_usage_summary(
             total_tokens=totals["total_tokens"],
             llm_calls=totals["llm_calls"],
             queries_tracked=tracked,
-            avg_tokens_per_query=round(totals["total_tokens"] / tracked, 1)
-            if tracked
-            else 0.0,
-            est_cost_usd=row_cost_usd(
-                totals["prompt_tokens"], totals["completion_tokens"]
-            ),
+            avg_tokens_per_query=round(totals["total_tokens"] / tracked, 1) if tracked else 0.0,
+            est_cost_usd=cost_usd(totals["prompt_tokens"], totals["completion_tokens"]),
         ),
         by_stage=[UsageStageOut(**r) for r in totals["by_stage"]],
         by_day=[UsageDayOut(**r) for r in totals["by_day"]],
         recent=[
             UsageQueryRowOut(
                 **r,
-                est_cost_usd=row_cost_usd(r["prompt_tokens"], r["completion_tokens"]),
+                est_cost_usd=cost_usd(r["prompt_tokens"], r["completion_tokens"]),
             )
             for r in recent
         ],
@@ -127,22 +102,18 @@ async def build_usage_summary(
     )
 
 
-async def recent_usage_rows(
-    user_id: int | None, limit: int
-) -> list[UsageQueryRowOut]:
-    """Newest-first per-query token rollups, optionally scoped to one user."""
+async def recent_usage_rows(user_id: int | None, limit: int) -> list[UsageQueryRowOut]:
     rows = await usage_per_query(user_id, min(max(limit, 1), 200))
     return [
         UsageQueryRowOut(
             **r,
-            est_cost_usd=row_cost_usd(r["prompt_tokens"], r["completion_tokens"]),
+            est_cost_usd=cost_usd(r["prompt_tokens"], r["completion_tokens"]),
         )
         for r in rows
     ]
 
 
 async def entry_usage_calls(entry_id: int) -> list[UsageCallOut]:
-    """Per-LLM-call token breakdown for one stored query (any owner)."""
     entry = await get_search_entry(entry_id)
     if entry is None:
         raise HTTPException(status_code=404, detail="Search not found.")

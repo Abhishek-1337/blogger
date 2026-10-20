@@ -1,5 +1,3 @@
-"""Focused checks for the token-usage collector (no DB, no network)."""
-
 import unittest
 from types import SimpleNamespace
 from uuid import uuid4

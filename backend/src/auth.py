@@ -1,11 +1,3 @@
-"""Google OAuth login + app JWT sessions.
-
-Flow: the frontend signs the user in with Google Identity Services and sends
-the Google ID token to POST /auth/google. We verify it against
-GOOGLE_CLIENT_ID, upsert the user, and return a short-lived app JWT. All
-blog/search endpoints require that JWT and are scoped to its user.
-"""
-
 import os
 from datetime import datetime, timedelta, timezone
 
@@ -16,12 +8,13 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.db import SessionLocal
 from src.models import User
 
 load_dotenv()
 
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "43200"))  # 30 days
+JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "43200"))
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -29,25 +22,18 @@ _bearer = HTTPBearer(auto_error=False)
 def _google_client_id() -> str:
     client_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
     if not client_id:
-        raise ValueError(
-            "GOOGLE_CLIENT_ID is not set — add your Google OAuth client ID "
-            "to backend/.env (and VITE_GOOGLE_CLIENT_ID for the frontend)."
-        )
+        raise ValueError("GOOGLE_CLIENT_ID is not set")
     return client_id
 
 
 def _jwt_secret() -> str:
     secret = os.getenv("JWT_SECRET_KEY", "").strip()
     if not secret:
-        raise ValueError(
-            "JWT_SECRET_KEY is not set — add a long random string "
-            "to backend/.env."
-        )
+        raise ValueError("JWT_SECRET_KEY is not set")
     return secret
 
 
 def verify_google_token(id_token: str) -> dict:
-    """Verify a Google ID token; return sub/email/name/picture."""
     from google.auth.transport import requests as google_requests
     from google.oauth2 import id_token as google_id_token
 
@@ -57,11 +43,10 @@ def verify_google_token(id_token: str) -> dict:
         )
     except Exception as e:
         raise ValueError(f"Google token verification failed: {e}")
-    sub = info.get("sub", "")
-    if not sub:
+    if not info.get("sub"):
         raise ValueError("Google token has no subject.")
     return {
-        "sub": sub,
+        "sub": info.get("sub", ""),
         "email": info.get("email", "") or "",
         "name": info.get("name", "") or "",
         "picture": info.get("picture", "") or "",
@@ -90,9 +75,7 @@ def decode_access_token(token: str) -> int:
 
 
 async def get_or_create_user(session: AsyncSession, claims: dict) -> User:
-    result = await session.execute(
-        select(User).where(User.google_sub == claims["sub"])
-    )
+    result = await session.execute(select(User).where(User.google_sub == claims["sub"]))
     user = result.scalars().first()
     if user is None:
         user = User(
@@ -108,18 +91,11 @@ async def get_or_create_user(session: AsyncSession, claims: dict) -> User:
 
 
 def admin_emails() -> set[str]:
-    """Lowercased allowlist from the ADMIN_EMAILS env var (comma-separated)."""
     raw = os.getenv("ADMIN_EMAILS", "")
     return {e.strip().lower() for e in raw.split(",") if e.strip()}
 
 
 def is_admin(user: User) -> bool:
-    """True when the user may see token/cost observability.
-
-    When ADMIN_EMAILS is unset, any signed-in user counts as admin so a
-    fresh deploy works out of the box. Set ADMIN_EMAILS in production to
-    restrict the admin observability app to your team.
-    """
     allow = admin_emails()
     if not allow:
         return True
@@ -129,15 +105,12 @@ def is_admin(user: User) -> bool:
 async def get_current_user(
     creds: HTTPAuthorizationCredentials | None = Depends(_bearer),
 ) -> User:
-    """FastAPI dependency: the JWT-authenticated user, else 401."""
     if creds is None or not creds.credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not signed in.",
         )
     user_id = decode_access_token(creds.credentials)
-    from src.db import SessionLocal
-
     async with SessionLocal() as session:
         user = await session.get(User, user_id)
     if user is None:
@@ -148,10 +121,7 @@ async def get_current_user(
     return user
 
 
-async def get_admin_user(
-    user: User = Depends(get_current_user),
-) -> User:
-    """FastAPI dependency: the JWT-authenticated admin user, else 403."""
+async def get_admin_user(user: User = Depends(get_current_user)) -> User:
     if not is_admin(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

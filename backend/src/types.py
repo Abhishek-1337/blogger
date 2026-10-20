@@ -1,8 +1,42 @@
-"""Request/response types for the usage observability routes."""
-
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class UserOut(BaseModel):
+    id: int
+    email: str
+    name: str
+    picture: str
+
+
+class GoogleLoginRequest(BaseModel):
+    id_token: str = Field(min_length=1)
+
+
+class LoginResponse(BaseModel):
+    token: str
+    user: UserOut
+
+
+class BlogRequest(BaseModel):
+    query: str = Field(min_length=1)
+
+
+class OutlineSectionOut(BaseModel):
+    title: str
+    bullets: list[str]
+
+
+class BlogResponse(BaseModel):
+    id: int | None = None
+    query: str
+    research_brief: str
+    outline: list[str]
+    sections: list[OutlineSectionOut]
+    outline_approved: bool
+    outline_revisions: int
+    outline_feedback: str
 
 
 class UsageStageOut(BaseModel):
@@ -22,6 +56,17 @@ class UsageBlockOut(BaseModel):
     total_tokens: int
     est_cost_usd: float
     by_stage: list[UsageStageOut] = []
+
+
+class BlogResponseWithUsage(BlogResponse):
+    usage: UsageBlockOut | None = None
+
+
+class SearchSummaryOut(BaseModel):
+    id: int
+    query: str
+    created_at: datetime
+    outline_approved: bool
 
 
 class UsageCallOut(BaseModel):
