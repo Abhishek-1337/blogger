@@ -54,3 +54,79 @@ rendering of results, and search history. The admin app is a separate
 surface focused on usage summaries and drill-downs rather than content
 creation, keeping everyday use and operational oversight cleanly
 separated.
+
+## Local setup
+
+You need Python 3.11+, Node 18+, and a Postgres database. A Google
+OAuth client ID and an OpenAI API key are required for sign-in and
+generation.
+
+Start with the backend. From the project root:
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+Then fill in the backend environment with your own values: your OpenAI
+API key, your Google OAuth client ID, a long random string for session
+signing, and optionally a comma-separated list of admin emails (when
+unset, every signed-in user is treated as admin, which is fine for
+local development only). Also add a line for your Postgres connection
+string, which the example file does not include yet:
+
+```bash
+DATABASE_URL=postgresql://user:pass@localhost:5432/blogger
+```
+After that, apply the database migrations and start the API:
+
+```bash
+alembic upgrade head
+uvicorn main:app --reload
+```
+
+The API serves on `http://localhost:8000`.
+
+Next, the user app. In a new terminal, from the project root:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+It serves on `http://localhost:5173` and forwards API calls to the
+backend automatically. It needs two values in its own environment: the
+backend URL (`http://localhost:8000`) and the same Google OAuth client
+ID the backend verifies against. Make sure the Google client allows
+`http://localhost:5173` as an authorized origin.
+
+The admin app follows the same pattern on its own port:
+
+```bash
+cd admin-frontend
+npm install
+npm run dev
+```
+
+It serves on `http://localhost:5174`, points at the same backend URL,
+uses the same Google client ID (allowing `http://localhost:5174` as
+well), and must be opened with an account on the admin allowlist.
+
+## Using the app
+
+Open the user app, sign in with Google, and type a topic into the
+composer. Generation takes a while — watch the staged progress from
+web search through research brief, outline draft, and editor review to
+the finished post. The result shows the research brief, the outline,
+and the review verdict alongside the final markdown article, and it is
+kept in history so you can reopen any past post.
+
+A usage view shows what your generations cost in tokens and estimated
+spend. Open the admin app with an admin account to see aggregate usage
+across users, recent queries, and a per-post breakdown of each model
+call with its stage, token counts, and latency.
+
