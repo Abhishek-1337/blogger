@@ -1,3 +1,5 @@
+import asyncio
+
 from ddgs import DDGS
 
 
@@ -16,3 +18,7 @@ def web_search(query: str, max_results: int = 5) -> list[dict]:
     except Exception as e:
         results.append({"title": "search error", "url": "", "snippet": str(e)})
     return results
+
+
+async def aweb_search(query: str, max_results: int = 5) -> list[dict]:
+    return await asyncio.to_thread(web_search, query, max_results)
