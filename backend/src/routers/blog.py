@@ -1,22 +1,23 @@
+from celery.result import AsyncResult
 from fastapi import APIRouter, Depends, HTTPException
 
-from src.auth import get_current_user, is_admin
+from src.auth import get_current_user
 from src.db import (
     get_search_entry,
     list_search_entries,
-    save_search_entry,
-    save_usage_events,
 )
-from src.graph import arun_blog_with_usage
 from src.models import User
+from src.services.celery_app import celery_app
 from src.types import (
     BlogRequest,
     BlogResponse,
-    BlogResponseWithUsage,
+    EnqueueResponse,
     SearchSummaryOut,
+    TaskStatusResponse,
 )
+from src.worker import generate_blog as generate_blog_task
 
-from .shared import db_errors, summarize_events, to_blog_response
+from .shared import db_errors, to_blog_response
 
 router = APIRouter()
 
@@ -45,55 +46,42 @@ async def get_search(entry_id: int, user: User = Depends(get_current_user)):
     return to_blog_response(entry)
 
 
-@router.post("/blog", response_model=BlogResponseWithUsage)
-async def generate_blog(req: BlogRequest, user: User = Depends(get_current_user)):
+@router.post("/blog/enqueue", response_model=EnqueueResponse, status_code=202)
+@db_errors
+async def enqueue_blog(req: BlogRequest, user: User = Depends(get_current_user)):
     query = req.query.strip()
     if not query:
         raise HTTPException(status_code=422, detail="Query must not be empty.")
     try:
-        final, usage_events = await arun_blog_with_usage(query)
-    except ValueError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        task = generate_blog_task.delay(query, user.id)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Blog generation failed: {e}")
+        raise HTTPException(status_code=503, detail=f"Queue unavailable: {e}")
+    return EnqueueResponse(task_id=task.id, status="queued")
 
-    if final.get("outline_feedback"):
-        feedback = final["outline_feedback"]
-    elif final.get("outline_approved"):
-        feedback = "Outline approved."
-    else:
-        feedback = ""
 
+@router.get("/blog/tasks/{task_id}", response_model=TaskStatusResponse)
+@db_errors
+async def get_blog_task(task_id: str, user: User = Depends(get_current_user)):
     try:
-        entry_id = await save_search_entry(
-            {
-                "query": query,
-                "research_brief": final.get("research_brief", ""),
-                "outline": final.get("outline", []),
-                "sections": final.get("sections", []),
-                "outline_approved": final.get("outline_approved", False),
-                "outline_revisions": final.get("outline_revisions", 0),
-                "outline_feedback": feedback,
-            },
-            user.id,
+        result = AsyncResult(task_id, app=celery_app)
+        state = result.state
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Queue unavailable: {e}")
+    if state == "SUCCESS":
+        payload = result.result or {}
+        return TaskStatusResponse(
+            task_id=task_id,
+            status="SUCCESS",
+            entry_id=payload.get("entry_id"),
+            outline_approved=payload.get("outline_approved"),
+            total_tokens=payload.get("total_tokens"),
+            est_cost_usd=payload.get("est_cost_usd"),
         )
-    except Exception as e:
-        print(f"Warning: failed to persist search entry: {e}")
-        entry_id = None
-    try:
-        await save_usage_events(usage_events, user.id, entry_id)
-    except Exception as e:
-        print(f"Warning: failed to persist usage events: {e}")
-
-    usage = summarize_events(usage_events) if is_admin(user) else None
-    return BlogResponseWithUsage(
-        id=entry_id,
-        query=query,
-        research_brief=final.get("research_brief", ""),
-        outline=final.get("outline", []),
-        sections=final.get("sections", []),
-        outline_approved=final.get("outline_approved", False),
-        outline_revisions=final.get("outline_revisions", 0),
-        outline_feedback=feedback,
-        usage=usage,
-    )
+    if state == "FAILURE":
+        return TaskStatusResponse(
+            task_id=task_id, status="FAILURE", error=str(result.result)
+        )
+    message = None
+    if isinstance(result.info, dict):
+        message = result.info.get("message")
+    return TaskStatusResponse(task_id=task_id, status=state, message=message)

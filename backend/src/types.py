@@ -23,6 +23,22 @@ class BlogRequest(BaseModel):
     query: str = Field(min_length=1)
 
 
+class EnqueueResponse(BaseModel):
+    task_id: str
+    status: str = "queued"
+
+
+class TaskStatusResponse(BaseModel):
+    task_id: str
+    status: str
+    message: str | None = None
+    entry_id: int | None = None
+    outline_approved: bool | None = None
+    total_tokens: int | None = None
+    est_cost_usd: float | None = None
+    error: str | None = None
+
+
 class OutlineSectionOut(BaseModel):
     title: str
     bullets: list[str]
