@@ -187,9 +187,3 @@ async def arun_blog_with_usage(query: str) -> tuple[dict, list[dict]]:
             }
         )
     return final, collector.events
-
-
-def run_blog_with_usage(query: str) -> tuple[dict, list[dict]]:
-    import asyncio
-
-    return asyncio.run(arun_blog_with_usage(query))
