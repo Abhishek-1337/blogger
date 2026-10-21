@@ -32,3 +32,11 @@ export interface BlogResponse {
   outline_revisions: number;
   outline_feedback: string;
 }
+
+export interface TaskStatus {
+  task_id: string;
+  status: string;
+  message?: string | null;
+  entry_id?: number | null;
+  error?: string | null;
+}
