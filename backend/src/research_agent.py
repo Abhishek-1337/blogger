@@ -8,7 +8,7 @@ from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
 from src.schema import BlogState
-from src.tools import web_search
+from src.tools import aweb_search
 from src.usage import callback_config, stage
 
 load_dotenv()
@@ -33,9 +33,9 @@ def _llm(temperature: float = 0.3) -> ChatOpenAI:
 
 
 @tool
-def search_web(query: str, max_results: int = 5) -> str:
+async def search_web(query: str, max_results: int = 5) -> str:
     """Search the live web for one focused angle of the topic."""
-    return json.dumps(web_search(query, max_results=max_results))
+    return json.dumps(await aweb_search(query, max_results=max_results))
 
 
 tools = [search_web]
@@ -60,7 +60,7 @@ class ResearchVerdict(BaseModel):
     )
 
 
-def _verify_results(query: str, search_results: list[dict]) -> ResearchVerdict:
+async def _verify_results(query: str, search_results: list[dict]) -> ResearchVerdict:
     critic = _llm(0.2).with_structured_output(ResearchVerdict)
     evidence = "\n".join(
         f"{i}. {r.get('title', '')} ({r.get('url', '')}): "
@@ -81,10 +81,10 @@ Approve only if ALL hold:
 If any fail, approved=false with specific fixes (which angles are missing,
 what to re-search)."""
     with stage("verify_research"):
-        return critic.invoke(prompt, config=callback_config())
+        return await critic.ainvoke(prompt, config=callback_config())
 
 
-def _run_research_pass(query: str, feedback: str) -> list[dict]:
+async def _run_research_pass(query: str, feedback: str) -> list[dict]:
     content = f"Research this topic: {query}"
     if feedback:
         content += (
@@ -93,7 +93,7 @@ def _run_research_pass(query: str, feedback: str) -> list[dict]:
         )
     agent = create_agent(_llm(), tools, system_prompt=RESEARCH_PROMPT)
     with stage("research"):
-        result = agent.invoke({"messages": [{"role": "user", "content": content}]}, config=callback_config())
+        result = await agent.ainvoke({"messages": [{"role": "user", "content": content}]}, config=callback_config())
 
     collected: list[dict] = []
     for m in result["messages"]:
@@ -107,20 +107,20 @@ def _run_research_pass(query: str, feedback: str) -> list[dict]:
             collected.extend(r for r in payload if isinstance(r, dict))
 
     if not collected:
-        collected = web_search(query, max_results=MAX_RESULTS)
+        collected = await aweb_search(query, max_results=MAX_RESULTS)
     return collected
 
 
-def research_agent_node(state: BlogState) -> dict:
+async def research_agent_node(state: BlogState) -> dict:
     revisions = state.get("research_revisions", 0) or 0
     feedback = state.get("research_feedback", "") or ""
     accumulated: list[dict] = list(state.get("search_results", []) or [])
     approved = False
 
     for _ in range(MAX_RESEARCH_REVISIONS):
-        collected = _run_research_pass(state["query"], feedback)
+        collected = await _run_research_pass(state["query"], feedback)
         accumulated = _dedupe([*accumulated, *collected])
-        verdict = _verify_results(state["query"], accumulated)
+        verdict = await _verify_results(state["query"], accumulated)
         approved = verdict.approved
         revisions += 1
         feedback = "" if approved else verdict.feedback
