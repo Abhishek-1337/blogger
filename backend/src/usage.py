@@ -40,55 +40,37 @@ def _num(value) -> int:
     return int(value or 0)
 
 
-def _model_name(response_metadata) -> str:
-    return str((response_metadata or {}).get("model_name", "") or "")
-
-
-def _output_tokens(response: Any) -> tuple[int, int, int, str]:
-    llm_output = getattr(response, "llm_output", None)
-    if not isinstance(llm_output, dict):
-        return 0, 0, 0, ""
-    usage = llm_output.get("token_usage") or {}
-    return (
-        _num(usage.get("prompt_tokens")),
-        _num(usage.get("completion_tokens")),
-        _num(usage.get("total_tokens")),
-        str(llm_output.get("model_name", "") or ""),
-    )
-
-
-def _message_tokens(message: Any) -> tuple[int, int, int, str]:
-    response_metadata = getattr(message, "response_metadata", None) or {}
-    meta = getattr(message, "usage_metadata", None) or {}
-    if meta.get("total_tokens"):
-        return (
-            _num(meta.get("input_tokens")),
-            _num(meta.get("output_tokens")),
-            _num(meta.get("total_tokens")),
-            _model_name(response_metadata),
-        )
-    tu = response_metadata.get("token_usage") or {}
-    return (
-        _num(tu.get("prompt_tokens")),
-        _num(tu.get("completion_tokens")),
-        _num(tu.get("total_tokens")),
-        _model_name(response_metadata),
-    )
-
-
 def _extract_tokens(response: Any) -> tuple[int, int, int, str]:
-    prompt, completion, total, model = _output_tokens(response)
+    prompt = completion = total = 0
+    model = ""
+
+    out = getattr(response, "llm_output", None) or {}
+    if isinstance(out, dict):
+        usage = out.get("token_usage") or {}
+        prompt = _num(usage.get("prompt_tokens"))
+        completion = _num(usage.get("completion_tokens"))
+        total = _num(usage.get("total_tokens"))
+        model = str(out.get("model_name") or "")
+
     if total == 0:
         for group in getattr(response, "generations", None) or []:
             for gen in group or []:
-                message = getattr(gen, "message", None)
-                if message is None:
+                msg = getattr(gen, "message", None)
+                if msg is None:
                     continue
-                p, c, t, m = _message_tokens(message)
-                prompt += p
-                completion += c
-                total += t
-                model = model or m
+                meta = getattr(msg, "usage_metadata", None) or {}
+                rm = getattr(msg, "response_metadata", None) or {}
+                if meta.get("total_tokens"):
+                    prompt += _num(meta.get("input_tokens"))
+                    completion += _num(meta.get("output_tokens"))
+                    total += _num(meta.get("total_tokens"))
+                else:
+                    tu = rm.get("token_usage") or {}
+                    prompt += _num(tu.get("prompt_tokens"))
+                    completion += _num(tu.get("completion_tokens"))
+                    total += _num(tu.get("total_tokens"))
+                model = model or str(rm.get("model_name") or "")
+
     if total == 0:
         total = prompt + completion
     return prompt, completion, total, model or MODEL
@@ -134,25 +116,26 @@ class UsageCollector(BaseCallbackHandler):
     def summary(self) -> dict:
         by_stage: dict[str, dict] = {}
         for e in self.events:
-            row = by_stage.setdefault(e["stage"], {"stage": e["stage"], "calls": 0,
-                "prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0, "latency_ms": 0})
+            row = by_stage.setdefault(
+                e["stage"],
+                {"stage": e["stage"], "calls": 0, "prompt_tokens": 0,
+                 "completion_tokens": 0, "total_tokens": 0, "latency_ms": 0},
+            )
             row["calls"] += 1
             row["prompt_tokens"] += e["prompt_tokens"]
             row["completion_tokens"] += e["completion_tokens"]
             row["total_tokens"] += e["total_tokens"]
             row["latency_ms"] += e["latency_ms"]
         for row in by_stage.values():
-            row["avg_latency_ms"] = int(row["latency_ms"] / row["calls"]) if row["calls"] else 0
+            row["avg_latency_ms"] = row["latency_ms"] // row["calls"] if row["calls"] else 0
         return {
             "calls": len(self.events),
             "prompt_tokens": sum(e["prompt_tokens"] for e in self.events),
             "completion_tokens": sum(e["completion_tokens"] for e in self.events),
             "total_tokens": sum(e["total_tokens"] for e in self.events),
             "est_cost_usd": round(
-                sum(
-                    estimate_cost_usd(e["model"], e["prompt_tokens"], e["completion_tokens"])
-                    for e in self.events
-                ),
+                sum(estimate_cost_usd(e["model"], e["prompt_tokens"], e["completion_tokens"])
+                    for e in self.events),
                 6,
             ),
             "by_stage": sorted(by_stage.values(), key=lambda r: -r["total_tokens"]),
