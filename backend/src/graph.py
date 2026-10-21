@@ -46,7 +46,7 @@ def _llm(temperature: float = 0.3) -> ChatOpenAI:
     return ChatOpenAI(model=MODEL, temperature=temperature)
 
 
-def summarize_node(state: BlogState) -> dict:
+async def summarize_node(state: BlogState) -> dict:
     llm = _llm(0.3)
     evidence = "\n".join(
         f"- {r.get('title', '')} ({r.get('url', '')}): {r.get('snippet', '')}"
@@ -66,11 +66,11 @@ def summarize_node(state: BlogState) -> dict:
 
     Keep it factual, cite only from the evidence above."""
     with stage("summarize"):
-        brief = llm.invoke(prompt, config=callback_config()).content
+        brief = (await llm.ainvoke(prompt, config=callback_config())).content
     return {"research_brief": brief}
 
 
-def outline_node(state: BlogState) -> dict:
+async def outline_node(state: BlogState) -> dict:
     structured_llm = _llm(0.7).with_structured_output(BlogOutline)
     feedback = state.get("outline_feedback", "") or ""
     revisions = state.get("outline_revisions", 0) or 0
@@ -98,7 +98,7 @@ def outline_node(state: BlogState) -> dict:
     - Each section: a short title plus 3-5 concrete talking points (facts, examples, stats from the brief).
     - No full prose, bullets only."""
     with stage("outline"):
-        result = structured_llm.invoke(prompt, config=callback_config())
+        result = await structured_llm.ainvoke(prompt, config=callback_config())
     outline = [s.title.strip() for s in result.sections if s.title.strip()]
     sections = [
         {
@@ -117,7 +117,7 @@ def outline_node(state: BlogState) -> dict:
     }
 
 
-def verify_outline_node(state: BlogState) -> dict:
+async def verify_outline_node(state: BlogState) -> dict:
     critic = _llm(0.2).with_structured_output(OutlineVerdict)
     outline_text = "\n".join(
         f"{i}. {s.get('title', '')}\n"
@@ -139,7 +139,7 @@ def verify_outline_node(state: BlogState) -> dict:
 
     If any fail, approved=false with specific fixes (what to add/drop/merge/split)."""
     with stage("verify_outline"):
-        verdict = critic.invoke(prompt, config=callback_config())
+        verdict = await critic.ainvoke(prompt, config=callback_config())
     return {"outline_approved": verdict.approved, "outline_feedback": verdict.feedback}
 
 
@@ -167,11 +167,11 @@ def build_graph():
     return graph.compile()
 
 
-def run_blog_with_usage(query: str) -> tuple[dict, list[dict]]:
+async def arun_blog_with_usage(query: str) -> tuple[dict, list[dict]]:
     collector = UsageCollector(query=query)
     with collector:
         app = build_graph()
-        final = app.invoke(
+        final = await app.ainvoke(
             {
                 "query": query,
                 "search_results": [],
@@ -187,3 +187,9 @@ def run_blog_with_usage(query: str) -> tuple[dict, list[dict]]:
             }
         )
     return final, collector.events
+
+
+def run_blog_with_usage(query: str) -> tuple[dict, list[dict]]:
+    import asyncio
+
+    return asyncio.run(arun_blog_with_usage(query))
