@@ -36,6 +36,7 @@ export interface BlogResponse {
 export interface TaskStatus {
   task_id: string;
   status: string;
+  stage?: string | null;
   message?: string | null;
   entry_id?: number | null;
   error?: string | null;

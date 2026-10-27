@@ -49,7 +49,8 @@ function sleep(ms: number): Promise<void> {
 export async function fetchBlog(
   query: string,
   apiUrl: string,
-  token: string
+  token: string,
+  onStage?: (stage: string) => void
 ): Promise<BlogResponse> {
   const res = await fetch(`${apiUrl}/blog/enqueue`, {
     method: "POST",
@@ -69,6 +70,7 @@ export async function fetchBlog(
       throw new Error(await readError(st, `Request failed (${st.status}).`));
     }
     const s = (await st.json()) as TaskStatus;
+    if (s.stage) onStage?.(s.stage);
     if (s.status === "SUCCESS") {
       if (s.entry_id == null) {
         throw new Error("Task finished without a result.");

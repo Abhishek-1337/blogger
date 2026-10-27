@@ -52,6 +52,23 @@ class BlogQueueTest(unittest.TestCase):
         self.assertEqual(body["status"], "SUCCESS")
         self.assertEqual(body["entry_id"], 42)
 
+    def test_task_status_progress_returns_stage(self):
+        with patch.object(
+            blog_router,
+            "AsyncResult",
+            lambda task_id, app=None: SimpleNamespace(
+                state="PROGRESS",
+                info={"stage": "outline", "message": "Drafting outline"},
+                result=None,
+            ),
+        ):
+            r = self.client.get("/blog/tasks/task-123")
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body["status"], "PROGRESS")
+        self.assertEqual(body["stage"], "outline")
+        self.assertEqual(body["message"], "Drafting outline")
+
     def test_task_status_failure(self):
         with patch.object(
             blog_router,

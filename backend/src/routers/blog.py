@@ -82,6 +82,10 @@ async def get_blog_task(task_id: str, user: User = Depends(get_current_user)):
             task_id=task_id, status="FAILURE", error=str(result.result)
         )
     message = None
+    stage = None
     if isinstance(result.info, dict):
         message = result.info.get("message")
-    return TaskStatusResponse(task_id=task_id, status=state, message=message)
+        stage = result.info.get("stage")
+    return TaskStatusResponse(
+        task_id=task_id, status=state, stage=stage, message=message
+    )

@@ -31,6 +31,7 @@ class EnqueueResponse(BaseModel):
 class TaskStatusResponse(BaseModel):
     task_id: str
     status: str
+    stage: str | None = None
     message: str | None = None
     entry_id: int | None = None
     outline_approved: bool | None = None

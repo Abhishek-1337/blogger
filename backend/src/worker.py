@@ -7,17 +7,25 @@ from src.services.celery_app import celery_app
 from src.usage import UsageCollector
 
 
+STAGE_MESSAGES = {
+    "research": "Searching the web",
+    "summarize": "Writing research brief",
+    "outline": "Drafting outline",
+    "verify_outline": "Editor review",
+    "saving": "Saving results",
+}
+
+
 async def _run_and_persist(
     query: str,
     user_id: int | None,
-    on_progress: Callable[[str], None] | None = None,
+    on_progress: Callable[[str, str], None] | None = None,
 ) -> dict:
-    def progress(message: str) -> None:
+    def progress(stage: str) -> None:
         if on_progress is not None:
-            on_progress(message)
+            on_progress(stage, STAGE_MESSAGES.get(stage, stage))
 
-    progress("Running research workflow...")
-    final, usage_events = await arun_blog_with_usage(query)
+    final, usage_events = await arun_blog_with_usage(query, on_progress=progress)
 
     if final.get("outline_feedback"):
         feedback = final["outline_feedback"]
@@ -26,7 +34,7 @@ async def _run_and_persist(
     else:
         feedback = ""
 
-    progress("Saving results...")
+    progress("saving")
     entry_id = await save_search_entry(
         {
             "query": query,
@@ -64,8 +72,10 @@ async def _run_and_persist(
     soft_time_limit=600,
 )
 def generate_blog(self, query: str, user_id: int | None = None) -> dict:
-    def on_progress(message: str) -> None:
-        self.update_state(state="PROGRESS", meta={"message": message})
+    def on_progress(stage: str, message: str) -> None:
+        self.update_state(
+            state="PROGRESS", meta={"stage": stage, "message": message}
+        )
 
     try:
         return asyncio.run(_run_and_persist(query.strip(), user_id, on_progress))

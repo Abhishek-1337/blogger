@@ -13,6 +13,7 @@ import Verdict from "./components/Verdict";
 const API_URL = import.meta.env.VITE_API_URL ?? "";
 
 const STAGES = ["Searching the web", "Writing research brief", "Drafting outline", "Editor review"];
+const STAGE_KEYS = ["research", "summarize", "outline", "verify_outline"];
 
 function toMarkdown(data: BlogResponse): string {
   const parts = [`# ${data.query}`, ""];
@@ -127,12 +128,6 @@ function Workspace() {
   useEffect(() => { void loadHistory(); }, [loadHistory]);
 
   useEffect(() => {
-    if (!busy) return;
-    const timer = setInterval(() => setActiveStage((i) => Math.min(i + 1, STAGES.length - 1)), 15000);
-    return () => clearInterval(timer);
-  }, [busy]);
-
-  useEffect(() => {
     if (!sidebarOpen) return;
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") setSidebarOpen(false); }
     window.addEventListener("keydown", onKey);
@@ -153,7 +148,10 @@ function Workspace() {
     if (!token) { setError("Please sign in again."); return; }
     setError(""); setResult(null); setSelectedId(null); setActiveStage(0); setBusy(true);
     try {
-      const data = await fetchBlog(topic, API_URL, token);
+      const data = await fetchBlog(topic, API_URL, token, (stage) => {
+        const idx = STAGE_KEYS.indexOf(stage);
+        if (idx >= 0) setActiveStage(idx);
+      });
       setResult(data); setSelectedId(data.id ?? null); void loadHistory();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");

@@ -167,23 +167,48 @@ def build_graph():
     return graph.compile()
 
 
-async def arun_blog_with_usage(query: str) -> tuple[dict, list[dict]]:
+# Node name -> next stage to report when that node finishes.
+_NEXT_STAGE = {
+    "research": "summarize",
+    "summarize": "outline",
+    "outline": "verify_outline",
+}
+
+
+async def arun_blog_with_usage(
+    query: str, on_progress=None
+) -> tuple[dict, list[dict]]:
     collector = UsageCollector(query=query)
+    initial = {
+        "query": query,
+        "search_results": [],
+        "research_brief": "",
+        "research_approved": False,
+        "research_feedback": "",
+        "research_revisions": 0,
+        "outline": [],
+        "sections": [],
+        "outline_feedback": "",
+        "outline_revisions": 0,
+        "outline_approved": False,
+    }
     with collector:
         app = build_graph()
-        final = await app.ainvoke(
-            {
-                "query": query,
-                "search_results": [],
-                "research_brief": "",
-                "research_approved": False,
-                "research_feedback": "",
-                "research_revisions": 0,
-                "outline": [],
-                "sections": [],
-                "outline_feedback": "",
-                "outline_revisions": 0,
-                "outline_approved": False,
-            }
-        )
+        if on_progress is not None:
+            on_progress("research")
+        final = dict(initial)
+        async for chunk in app.astream(initial, stream_mode="updates"):
+            for node, update in (chunk or {}).items():
+                if isinstance(update, dict):
+                    final.update(update)
+                if on_progress is None:
+                    continue
+                if node == "verify_outline":
+                    # Rejected outline loops back to drafting, else we're done.
+                    if not final.get("outline_approved") and (
+                        final.get("outline_revisions", 0) or 0
+                    ) < MAX_OUTLINE_REVISIONS:
+                        on_progress("outline")
+                elif node in _NEXT_STAGE:
+                    on_progress(_NEXT_STAGE[node])
     return final, collector.events
