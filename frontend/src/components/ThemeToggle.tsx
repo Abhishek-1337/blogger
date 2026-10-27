@@ -27,7 +27,7 @@ export default function ThemeToggle() {
       aria-pressed={dark}
       aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
       title={dark ? "Switch to light mode" : "Switch to dark mode"}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-md text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+      className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-fog transition-colors hover:bg-wash hover:text-ink dark:hover:bg-white/[0.07] dark:hover:text-white"
     >
       {dark ? (
         <svg

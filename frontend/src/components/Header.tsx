@@ -18,9 +18,7 @@ export default function Header({ onMenu, user, onSignOut }: HeaderProps) {
       if (e.key === "Escape") setMenuOpen(false);
     }
     function onClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
     }
     document.addEventListener("keydown", onKey);
     document.addEventListener("mousedown", onClick);
@@ -29,105 +27,47 @@ export default function Header({ onMenu, user, onSignOut }: HeaderProps) {
       document.removeEventListener("mousedown", onClick);
     };
   }, [menuOpen]);
+
   return (
-    <header className="bg-pine text-white shadow-[inset_0_-1px_0_rgba(0,0,0,0.2)] dark:bg-[#0e1a15] dark:shadow-[0_1px_0_rgba(255,255,255,0.07),0_12px_32px_rgba(0,0,0,0.45)]">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3">
+    <header className="sticky top-0 z-40 border-b border-line bg-white/85 backdrop-blur-md dark:border-white/[0.07] dark:bg-night/85">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5">
         <div className="flex items-center gap-3">
           {onMenu && (
-            <button
-              type="button"
-              onClick={onMenu}
-              aria-label="Open previous searches"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-md text-white/85 transition-colors hover:bg-white/10 hover:text-white lg:hidden"
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 20 20"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                aria-hidden="true"
-              >
-                <line x1="3" y1="5" x2="17" y2="5" />
-                <line x1="3" y1="10" x2="17" y2="10" />
-                <line x1="3" y1="15" x2="17" y2="15" />
-              </svg>
+            <button type="button" onClick={onMenu} aria-label="Open previous searches"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-fog transition-colors hover:bg-wash hover:text-ink lg:hidden dark:hover:bg-white/[0.07] dark:hover:text-white">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><line x1="3" y1="5" x2="17" y2="5" /><line x1="3" y1="10" x2="17" y2="10" /><line x1="3" y1="15" x2="17" y2="15" /></svg>
             </button>
           )}
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-white font-serif text-xl font-bold text-pine ring-1 ring-black/10 dark:bg-sage dark:text-[#0b1511] dark:shadow-[0_0_20px_rgba(143,208,174,0.35)] dark:ring-sage/40">
-            B
-          </span>
-          <div>
-            <p className="font-serif text-[22px] font-bold leading-none tracking-tight">
-              Blogger
-            </p>
-            <p className="mt-1 text-xs text-white/75">
-              Research-backed blog outlines
-            </p>
-          </div>
+          <a href="#" onClick={(e) => e.preventDefault()} className="flex items-center gap-2.5" aria-label="Blogger home">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-pinedeep font-serif text-xl font-bold text-white shadow-card dark:bg-sage dark:text-[#0b1511]">B</span>
+            <span className="font-serif text-[22px] font-bold leading-none tracking-tight">Blogger</span>
+          </a>
+          <span className="ml-1 hidden rounded-full border border-line px-2.5 py-1 font-mono text-[11px] font-medium text-fog sm:inline dark:border-white/10">Research → Draft</span>
         </div>
-        <div className="flex items-center gap-1">
+
+        <div className="flex items-center gap-1.5">
           <ThemeToggle />
           {user && (
             <div ref={menuRef} className="relative">
-              <button
-                type="button"
-                onClick={() => setMenuOpen((v) => !v)}
-                aria-haspopup="menu"
-                aria-expanded={menuOpen}
-                aria-label="Account menu"
-                className="ml-1 flex items-center rounded-full outline-none transition-shadow hover:ring-2 hover:ring-white/40 focus-visible:ring-2 focus-visible:ring-white/60"
-              >
+              <button type="button" onClick={() => setMenuOpen((v) => !v)} aria-haspopup="menu" aria-expanded={menuOpen} aria-label="Account menu"
+                className="ml-1 flex items-center gap-2 rounded-full py-1 pl-1 pr-2 outline-none transition-colors hover:bg-wash dark:hover:bg-white/[0.07]">
                 {user.picture ? (
-                  <img
-                    src={user.picture}
-                    alt=""
-                    referrerPolicy="no-referrer"
-                    className="h-8 w-8 rounded-full ring-1 ring-white/30"
-                  />
+                  <img src={user.picture} alt="" referrerPolicy="no-referrer" className="h-8 w-8 rounded-full ring-1 ring-line dark:ring-white/20" />
                 ) : (
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-sm font-bold">
-                    {(user.name || user.email || "?").charAt(0).toUpperCase()}
-                  </span>
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-pine text-sm font-bold text-white dark:bg-sage dark:text-[#0b1511]">{(user.name || user.email || "?").charAt(0).toUpperCase()}</span>
                 )}
+                <span className="hidden max-w-[140px] truncate text-sm font-medium md:block">{user.name?.split(" ")[0] || "Account"}</span>
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="text-fog"><path d="M5 8l5 5 5-5" /></svg>
               </button>
               {menuOpen && (
-                <div
-                  role="menu"
-                  className="absolute right-0 z-50 mt-2 w-60 overflow-hidden rounded-xl border border-line bg-white text-ink shadow-lg dark:border-white/10 dark:bg-panel dark:shadow-[0_16px_48px_rgba(0,0,0,0.5)]"
-                >
+                <div role="menu" className="absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-xl border border-line bg-white shadow-lift dark:border-white/10 dark:bg-panel">
                   <div className="border-b border-line px-4 py-3 dark:border-white/[0.07]">
-                    <p className="truncate text-sm font-semibold">
-                      {user.name || "Signed in"}
-                    </p>
-                    {user.name && (
-                      <p className="mt-0.5 truncate text-xs text-fog">
-                        {user.email}
-                      </p>
-                    )}
+                    <p className="truncate text-sm font-semibold">{user.name || "Signed in"}</p>
+                    {user.name && <p className="mt-0.5 truncate text-xs text-fog">{user.email}</p>}
                   </div>
                   <div className="p-1.5">
-                    <a
-                      href="/docs"
-                      role="menuitem"
-                      onClick={() => setMenuOpen(false)}
-                      className="block rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-wash dark:hover:bg-white/[0.06]"
-                    >
-                      API docs
-                    </a>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        onSignOut?.();
-                      }}
-                      className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors hover:bg-wash dark:hover:bg-white/[0.06]"
-                    >
-                      Sign out
-                    </button>
+                    <a href="/docs" role="menuitem" onClick={() => setMenuOpen(false)} className="block rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-wash dark:hover:bg-white/[0.06]">API docs</a>
+                    <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onSignOut?.(); }} className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-clay transition-colors hover:bg-[#f9ece8] dark:text-rose dark:hover:bg-rose/[0.08]">Sign out</button>
                   </div>
                 </div>
               )}
@@ -135,7 +75,6 @@ export default function Header({ onMenu, user, onSignOut }: HeaderProps) {
           )}
         </div>
       </div>
-      <div className="h-[3px] bg-ochre" aria-hidden="true" />
     </header>
   );
 }

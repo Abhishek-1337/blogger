@@ -1,26 +1,23 @@
 import Markdown from "react-markdown";
 import type { BlogResponse } from "../types";
 
-interface VerdictProps {
-  data: BlogResponse;
-}
-
-export default function Verdict({ data }: VerdictProps) {
+export default function Verdict({ data }: { data: BlogResponse }) {
   const revs = data.outline_revisions ?? 0;
   const feedback = (data.outline_feedback || "").trim();
+  const approved = data.outline_approved;
   return (
-    <div className="mb-6 rounded-lg border border-pine/25 bg-[#edf2ef] px-4 py-3 text-sm shadow-sm dark:border-sage/20 dark:bg-[#121915] dark:bg-gradient-to-b dark:from-sage/[0.09] dark:to-transparent dark:shadow-[0_8px_28px_rgba(0,0,0,0.4)]">
-      <strong className="text-pine dark:text-sage">
-        {data.outline_approved ? "Approved" : "Draft"}
-      </strong>
-      <span>
-        {" "}
-        — outline after {revs} revision{revs === 1 ? "" : "s"}.
-      </span>
-      {feedback && (
-        <div className="md-body mt-1.5">
-          <Markdown>{feedback}</Markdown>
-        </div>
+    <div className={`rounded-2xl border p-5 shadow-card sm:p-6 ${approved ? "border-pine/25 bg-[#eaf3ed] dark:border-sage/25 dark:bg-sage/[0.08]" : "border-ochre/30 bg-[#fbf4e4] dark:border-ochrebright/25 dark:bg-ochrebright/[0.07]"}`}>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <span aria-hidden="true" className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold text-white ${approved ? "bg-pine dark:bg-sage dark:text-[#0b1511]" : "bg-ochre"}`}>{approved ? "✓" : "◐"}</span>
+        <p className="font-serif text-lg font-bold tracking-tight">{approved ? "Editor approved" : "Editor draft"}</p>
+        <span className="rounded-full bg-white/70 px-2.5 py-1 font-mono text-[11px] font-medium text-fog ring-1 ring-black/5 dark:bg-white/[0.06] dark:ring-white/10">
+          {revs} revision{revs === 1 ? "" : "s"}
+        </span>
+      </div>
+      {feedback ? (
+        <div className="md-body mt-3 text-[15px]"><Markdown>{feedback}</Markdown></div>
+      ) : (
+        <p className="mt-2 text-sm text-fog">{approved ? "The outline passed review and is ready to read below." : "The outline is shown below as a working draft."}</p>
       )}
     </div>
   );
