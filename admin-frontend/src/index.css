@@ -3,9 +3,9 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-serif: "Fraunces", Georgia, "Times New Roman", serif;
-  --font-sans: "DM Sans", ui-sans-system, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-serif: "Ubuntu", ui-sans-system, system-ui, sans-serif;
+  --font-sans: "Ubuntu", ui-sans-system, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Ubuntu Mono", ui-monospace, "SF Mono", Menlo, monospace;
 
   --color-pine: #175e4c;
   --color-pinedeep: #0f4436;

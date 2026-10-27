@@ -55,7 +55,7 @@ export default function Composer({ query, busy, error, compact = false, onQueryC
             <p className="mt-0.5 font-mono text-[11px] text-fog" aria-live="polite">{count}/300</p>
           </div>
           <button type="button" onClick={onSubmit} disabled={busy}
-            className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-pine px-6 py-3 text-base font-semibold text-white shadow-card transition hover:bg-pinedeep active:scale-[0.98] disabled:cursor-wait disabled:opacity-55 sm:w-auto dark:bg-sage dark:text-[#0b1511] dark:hover:bg-[#a6e0bb]">
+            className="inline-flex w-full shrink-0 items-center justify-center gap-1.5 self-center rounded-lg bg-pine px-4 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-pinedeep active:scale-[0.98] disabled:cursor-wait disabled:opacity-55 sm:w-auto dark:bg-sage dark:text-[#0b1511] dark:hover:bg-[#a6e0bb]">
             {busy ? "Generating…" : (<>Generate <span aria-hidden="true">→</span></>)}
           </button>
         </div>
