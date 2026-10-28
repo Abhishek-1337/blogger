@@ -75,18 +75,24 @@ async def outline_node(state: BlogState) -> dict:
     feedback = state.get("outline_feedback", "") or ""
     revisions = state.get("outline_revisions", 0) or 0
 
+    is_retry = bool(feedback) or revisions > 0 or (
+        state.get("outline_approved") is False and bool(state.get("sections"))
+    )
     retry_block = ""
-    if feedback:
+    if is_retry:
         previous = "\n".join(
             f"- {s.get('title', '')}: {'; '.join(s.get('bullets', []))}"
-            for s in state["sections"]
+            for s in state.get("sections") or []
         )
         retry_block = f"""
+    The last outline approval failed: the previous outline was not approved by the editor.
+    Editor feedback from the failed approval:
+    {feedback or "(no specific feedback provided)"}
+
     Previous attempt (revise, don't repeat its mistakes):
     {previous}
 
-    Critic feedback to fix:
-    {feedback}"""
+    Address the feedback above in this new outline."""
 
     prompt = f"""Based on this research brief, create a blog outline of 4-6 sections.
 
