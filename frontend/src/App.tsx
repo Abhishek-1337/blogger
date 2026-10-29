@@ -108,6 +108,8 @@ function Workspace() {
   const [selectingId, setSelectingId] = useState<number | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [viewingSaved, setViewingSaved] = useState(false);
+  const [libraryCollapsed, setLibraryCollapsed] = useState(false);
   const [copied, setCopied] = useState(false);
   const resultsRef = useRef<HTMLElement>(null);
 
@@ -138,7 +140,7 @@ function Workspace() {
   useEffect(() => { if (!copied) return; const t = setTimeout(() => setCopied(false), 2000); return () => clearTimeout(t); }, [copied]);
 
   function newSearch() {
-    setQuery(""); setResult(null); setSelectedId(null); setError(""); setSidebarOpen(false);
+    setQuery(""); setResult(null); setSelectedId(null); setError(""); setSidebarOpen(false); setViewingSaved(false); setLibraryCollapsed(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -146,7 +148,7 @@ function Workspace() {
     const topic = query.trim();
     if (!topic) { setError("Enter a topic first — anything you want to write about."); return; }
     if (!token) { setError("Please sign in again."); return; }
-    setError(""); setResult(null); setSelectedId(null); setActiveStage(0); setBusy(true);
+    setError(""); setResult(null); setSelectedId(null); setActiveStage(0); setBusy(true); setViewingSaved(false); setLibraryCollapsed(false);
     try {
       const data = await fetchBlog(topic, API_URL, token, (stage) => {
         const idx = STAGE_KEYS.indexOf(stage);
@@ -163,7 +165,7 @@ function Workspace() {
     setError(""); setSelectingId(id);
     try {
       const data = await fetchSearch(API_URL, id, token);
-      setResult(data); setSelectedId(data.id ?? id); setQuery(data.query); setSidebarOpen(false);
+      setResult(data); setSelectedId(data.id ?? id); setQuery(data.query); setSidebarOpen(false); setViewingSaved(true); setLibraryCollapsed(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally { setSelectingId(null); }
@@ -181,13 +183,34 @@ function Workspace() {
     URL.revokeObjectURL(url);
   }
 
+  function showLibrary() {
+    setLibraryCollapsed(false);
+    setSidebarOpen(true);
+  }
+
   const sidebarBody = (
     <History entries={history} loading={historyLoading} unavailable={historyUnavailable} disabled={busy} selectingId={selectingId} selectedId={selectedId} onSelect={openEntry} onRetry={loadHistory} />
   );
 
   return (
-    <Shell onMenu={() => setSidebarOpen(true)} onSignOut={signOut} newSearch={newSearch} sidebarBody={sidebarBody} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} count={history.length}>
-      <Composer query={query} busy={busy} error={error} compact={!!result} onQueryChange={setQuery} onSubmit={generate} />
+    <Shell onMenu={() => setSidebarOpen(true)} onSignOut={signOut} newSearch={newSearch} sidebarBody={sidebarBody} sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} count={history.length} sidebarCollapsed={viewingSaved && libraryCollapsed} onHideLibrary={viewingSaved ? () => { setLibraryCollapsed(true); setSidebarOpen(false); } : undefined}>
+      {!viewingSaved && <Composer query={query} busy={busy} error={error} compact={!!result} onQueryChange={setQuery} onSubmit={generate} />}
+      {viewingSaved && error && (
+        <p role="alert" className="flex items-start gap-2 rounded-xl border border-clay/25 bg-[#fbf0ec] px-4 py-3 text-sm text-clay dark:border-rose/25 dark:bg-rose/[0.08] dark:text-rose">
+          <span aria-hidden="true" className="mt-0.5 font-bold">!</span><span>{error}</span>
+        </p>
+      )}
+
+      {viewingSaved && libraryCollapsed && (
+        <div className="flex items-center justify-between gap-3">
+          <button type="button" onClick={showLibrary} aria-label="Show library"
+            className="inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-1.5 text-[13px] font-semibold shadow-card transition hover:bg-wash dark:border-white/10 dark:bg-panel dark:hover:bg-white/[0.07]">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><line x1="3" y1="5" x2="17" y2="5" /><line x1="3" y1="10" x2="17" y2="10" /><line x1="3" y1="15" x2="17" y2="15" /></svg>
+            Library
+          </button>
+          <span className="font-mono text-[11px] text-fog">Reading view</span>
+        </div>
+      )}
 
       {busy && <ProgressPill stages={STAGES} active={activeStage} />}
       {!busy && !result && <HowItWorks />}
@@ -213,25 +236,36 @@ function Workspace() {
   );
 }
 
-function Shell({ children, onMenu, onSignOut, newSearch, sidebarBody, sidebarOpen, setSidebarOpen, count }: {
+function Shell({ children, onMenu, onSignOut, newSearch, sidebarBody, sidebarOpen, setSidebarOpen, count, sidebarCollapsed = false, onHideLibrary }: {
   children: React.ReactNode; onMenu: () => void; onSignOut: () => void; newSearch: () => void;
   sidebarBody: React.ReactNode; sidebarOpen: boolean; setSidebarOpen: (v: boolean) => void; count: number;
+  sidebarCollapsed?: boolean; onHideLibrary?: () => void;
 }) {
   const { user } = useAuth();
   const sidebarHead = (
     <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-3.5 dark:border-white/[0.07]">
       <h2 className="font-serif text-[17px] font-bold tracking-tight">Library{count > 0 && <span className="ml-2 rounded-full bg-wash px-2 py-0.5 align-middle font-mono text-[11px] font-medium text-fog dark:bg-white/[0.07]">{count}</span>}</h2>
-      <button type="button" onClick={newSearch} className="rounded-lg bg-pine px-3 py-1.5 text-[13px] font-semibold text-white transition hover:bg-pinedeep dark:bg-sage dark:text-[#16241b] dark:hover:bg-[#b9e4cb]">+ New post</button>
+      <div className="flex items-center gap-1.5">
+        {onHideLibrary && (
+          <button type="button" onClick={onHideLibrary} aria-label="Hide library while reading" title="Hide library"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-fog transition hover:bg-wash hover:text-ink dark:hover:bg-white/[0.07] dark:hover:text-white">
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4l-5 6 5 6" /></svg>
+          </button>
+        )}
+        <button type="button" onClick={newSearch} className="rounded-lg bg-pine px-3 py-1.5 text-[13px] font-semibold text-white transition hover:bg-pinedeep dark:bg-sage dark:text-[#16241b] dark:hover:bg-[#b9e4cb]">+ New post</button>
+      </div>
     </div>
   );
   return (
     <div className="min-h-screen bg-paper font-sans text-ink antialiased dark:bg-night">
       <Header onMenu={onMenu} user={user} onSignOut={onSignOut} />
-      <div className="mx-auto flex max-w-6xl items-start gap-6 px-5 pb-20 pt-6">
-        <aside aria-label="Previous searches sidebar" className="sticky top-24 hidden max-h-[calc(100vh-7rem)] w-80 shrink-0 overflow-y-auto rounded-2xl border border-line bg-white shadow-card lg:block dark:border-white/10 dark:bg-panel">
-          {sidebarHead}
-          {sidebarBody}
-        </aside>
+      <div className={sidebarCollapsed ? "mx-auto max-w-3xl px-5 pb-20 pt-6" : "mx-auto flex max-w-6xl items-start gap-6 px-5 pb-20 pt-6"}>
+        {!sidebarCollapsed && (
+          <aside aria-label="Previous searches sidebar" className="sticky top-24 hidden max-h-[calc(100vh-7rem)] w-80 shrink-0 overflow-y-auto rounded-2xl border border-line bg-white shadow-card lg:block dark:border-white/10 dark:bg-panel">
+            {sidebarHead}
+            {sidebarBody}
+          </aside>
+        )}
         <main className="min-w-0 flex-1">{children}</main>
       </div>
       {sidebarOpen && (
