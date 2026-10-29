@@ -56,7 +56,7 @@ function SignInScreen() {
       <div className="flex items-center justify-center bg-paper px-5 py-10 dark:bg-night">
         <div className="w-full max-w-sm animate-rise">
           <div className="mb-6 flex items-center gap-2.5 lg:hidden">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-pinedeep font-serif text-xl font-bold text-white dark:bg-sage dark:text-[#0b1511]">B</span>
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-pinedeep font-serif text-xl font-bold text-white dark:bg-sage dark:text-[#16241b]">B</span>
             <span className="font-serif text-[22px] font-bold tracking-tight">Blogger</span>
           </div>
           <h2 className="font-serif text-[30px] font-bold leading-tight tracking-tight">Welcome back</h2>
@@ -201,7 +201,7 @@ function Workspace() {
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={copyResult} className="rounded-lg border border-line bg-white px-3.5 py-2 text-sm font-semibold shadow-card transition hover:bg-wash dark:border-white/10 dark:bg-panel dark:hover:bg-white/[0.07]">{copied ? "Copied ✓" : "Copy markdown"}</button>
-              <button type="button" onClick={downloadResult} className="rounded-lg bg-pine px-3.5 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-pinedeep dark:bg-sage dark:text-[#0b1511] dark:hover:bg-[#a6e0bb]">Download .md</button>
+              <button type="button" onClick={downloadResult} className="rounded-lg bg-pine px-3.5 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-pinedeep dark:bg-sage dark:text-[#16241b] dark:hover:bg-[#b9e4cb]">Download .md</button>
             </div>
           </div>
           <div className="mt-4"><Verdict data={result} /></div>
@@ -221,7 +221,7 @@ function Shell({ children, onMenu, onSignOut, newSearch, sidebarBody, sidebarOpe
   const sidebarHead = (
     <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-3.5 dark:border-white/[0.07]">
       <h2 className="font-serif text-[17px] font-bold tracking-tight">Library{count > 0 && <span className="ml-2 rounded-full bg-wash px-2 py-0.5 align-middle font-mono text-[11px] font-medium text-fog dark:bg-white/[0.07]">{count}</span>}</h2>
-      <button type="button" onClick={newSearch} className="rounded-lg bg-pine px-3 py-1.5 text-[13px] font-semibold text-white transition hover:bg-pinedeep dark:bg-sage dark:text-[#0b1511] dark:hover:bg-[#a6e0bb]">+ New post</button>
+      <button type="button" onClick={newSearch} className="rounded-lg bg-pine px-3 py-1.5 text-[13px] font-semibold text-white transition hover:bg-pinedeep dark:bg-sage dark:text-[#16241b] dark:hover:bg-[#b9e4cb]">+ New post</button>
     </div>
   );
   return (
@@ -236,8 +236,8 @@ function Shell({ children, onMenu, onSignOut, newSearch, sidebarBody, sidebarOpe
       </div>
       {sidebarOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] dark:bg-black/65" onClick={() => setSidebarOpen(false)} aria-hidden="true" />
-          <aside role="dialog" aria-modal="true" aria-label="Previous searches" className="absolute inset-y-0 left-0 flex w-80 max-w-[85vw] flex-col bg-white shadow-lift dark:border-r dark:border-white/10 dark:bg-[#101411]">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] dark:bg-black/50" onClick={() => setSidebarOpen(false)} aria-hidden="true" />
+          <aside role="dialog" aria-modal="true" aria-label="Previous searches" className="absolute inset-y-0 left-0 flex w-80 max-w-[85vw] flex-col bg-white shadow-lift dark:border-r dark:border-white/10 dark:bg-panel">
             <div className="flex items-center gap-2">
               <div className="flex-1">{sidebarHead}</div>
               <button type="button" onClick={() => setSidebarOpen(false)} aria-label="Close previous searches" className="mr-3 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-fog transition hover:bg-wash dark:hover:bg-white/[0.07]">✕</button>
@@ -255,7 +255,7 @@ function GatedApp() {
   if (!ready) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-paper dark:bg-night">
-        <span className="inline-flex h-11 w-11 items-center justify-center rounded-[12px] bg-pinedeep font-serif text-2xl font-bold text-white dark:bg-sage dark:text-[#0b1511]">B</span>
+        <span className="inline-flex h-11 w-11 items-center justify-center rounded-[12px] bg-pinedeep font-serif text-2xl font-bold text-white dark:bg-sage dark:text-[#16241b]">B</span>
         <p className="text-sm text-fog">Opening Blogger…</p>
       </div>
     );

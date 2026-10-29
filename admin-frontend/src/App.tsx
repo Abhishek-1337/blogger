@@ -12,10 +12,10 @@ function fmtLatency(ms: number): string { return ms >= 1000 ? `${(ms / 1000).toF
 function Card({ label, value, sub, accent = false }: { label: string; value: string; sub?: string; accent?: boolean }) {
   if (accent) {
     return (
-      <div className="rounded-2xl bg-pinedeep p-5 text-white shadow-card dark:bg-sage dark:text-[#0b1511]">
-        <p className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-white/60 dark:text-[#0b1511]/60">{label}</p>
+      <div className="rounded-2xl bg-pinedeep p-5 text-white shadow-card dark:bg-sage dark:text-[#16241b]">
+        <p className="font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-white/60 dark:text-[#16241b]/60">{label}</p>
         <p className="mt-1.5 font-serif text-[32px] font-bold leading-none tracking-tight">{value}</p>
-        {sub && <p className="mt-2 text-[13px] text-white/70 dark:text-[#0b1511]/70">{sub}</p>}
+        {sub && <p className="mt-2 text-[13px] text-white/70 dark:text-[#16241b]/70">{sub}</p>}
       </div>
     );
   }
@@ -33,7 +33,7 @@ function SignInScreen() {
     <div className="flex min-h-screen items-center justify-center bg-paper px-5 py-10 dark:bg-night">
       <div className="w-full max-w-sm animate-rise">
         <div className="flex items-center gap-2.5">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-pinedeep font-serif text-xl font-bold text-white dark:bg-sage dark:text-[#0b1511]">B</span>
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-pinedeep font-serif text-xl font-bold text-white dark:bg-sage dark:text-[#16241b]">B</span>
           <span className="font-serif text-[22px] font-bold tracking-tight">Blogger <span className="font-sans text-sm font-semibold text-fog">Admin</span></span>
         </div>
         <h1 className="mt-6 font-serif text-[30px] font-bold leading-tight tracking-tight">Usage &amp; cost observability</h1>
@@ -128,10 +128,10 @@ function Dashboard({ token }: { token: string }) {
 
   return (
     <div className="min-h-screen bg-paper font-sans text-ink antialiased dark:bg-night">
-      <header className="sticky top-0 z-40 border-b border-line bg-white/85 backdrop-blur-md dark:border-white/[0.07] dark:bg-night/85">
+      <header className="sticky top-0 z-40 border-b border-line bg-white/85 backdrop-blur-md dark:border-white/[0.07] dark:bg-[#151715]/90">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-5">
           <div className="flex items-center gap-2.5">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-pinedeep font-serif text-xl font-bold text-white dark:bg-sage dark:text-[#0b1511]">B</span>
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-pinedeep font-serif text-xl font-bold text-white dark:bg-sage dark:text-[#16241b]">B</span>
             <div>
               <p className="font-serif text-[19px] font-bold leading-none tracking-tight">Blogger <span className="font-sans text-[13px] font-semibold text-fog">Admin</span></p>
               <p className="mt-1 font-mono text-[11px] text-fog">Token &amp; cost observability</p>
@@ -140,7 +140,7 @@ function Dashboard({ token }: { token: string }) {
           <div className="flex items-center gap-2">
             <span className="hidden max-w-[220px] truncate text-sm text-fog md:block">{user?.email}</span>
             <button type="button" onClick={load} disabled={loading} className="rounded-lg border border-line bg-white px-3 py-2 text-[13px] font-semibold shadow-card transition hover:bg-wash disabled:opacity-60 dark:border-white/10 dark:bg-panel dark:hover:bg-white/[0.07]">{loading ? "Refreshing…" : "↻ Refresh"}</button>
-            <button type="button" onClick={signOut} className="rounded-lg bg-pine px-3 py-2 text-[13px] font-semibold text-white transition hover:bg-pinedeep dark:bg-sage dark:text-[#0b1511]">Sign out</button>
+            <button type="button" onClick={signOut} className="rounded-lg bg-pine px-3 py-2 text-[13px] font-semibold text-white transition hover:bg-pinedeep dark:bg-sage dark:text-[#16241b]">Sign out</button>
           </div>
         </div>
       </header>
@@ -160,7 +160,7 @@ function Dashboard({ token }: { token: string }) {
           <div className="rounded-2xl border border-clay/25 bg-white p-8 text-center shadow-card dark:border-rose/25 dark:bg-panel">
             <p className="font-serif text-lg font-bold">Couldn't load usage</p>
             <p role="alert" className="mx-auto mt-1 max-w-md text-sm text-fog">{error}</p>
-            <button type="button" onClick={() => void load()} className="mt-4 rounded-lg bg-pine px-4 py-2 text-sm font-semibold text-white transition hover:bg-pinedeep dark:bg-sage dark:text-[#0b1511]">Retry</button>
+            <button type="button" onClick={() => void load()} className="mt-4 rounded-lg bg-pine px-4 py-2 text-sm font-semibold text-white transition hover:bg-pinedeep dark:bg-sage dark:text-[#16241b]">Retry</button>
           </div>
         ) : !data || data.totals.llm_calls === 0 ? (
           <div className="rounded-2xl border border-dashed border-line bg-white p-10 text-center shadow-card dark:border-white/15 dark:bg-panel">
@@ -275,7 +275,7 @@ function GatedApp() {
   if (!ready) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-paper dark:bg-night">
-        <span className="inline-flex h-11 w-11 items-center justify-center rounded-[12px] bg-pinedeep font-serif text-2xl font-bold text-white dark:bg-sage dark:text-[#0b1511]">B</span>
+        <span className="inline-flex h-11 w-11 items-center justify-center rounded-[12px] bg-pinedeep font-serif text-2xl font-bold text-white dark:bg-sage dark:text-[#16241b]">B</span>
         <p className="text-sm text-fog">Opening Blogger Admin…</p>
       </div>
     );

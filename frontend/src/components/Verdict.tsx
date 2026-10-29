@@ -8,7 +8,7 @@ export default function Verdict({ data }: { data: BlogResponse }) {
   return (
     <div className={`rounded-2xl border p-5 shadow-card sm:p-6 ${approved ? "border-pine/25 bg-[#eaf3ed] dark:border-sage/25 dark:bg-sage/[0.08]" : "border-ochre/30 bg-[#fbf4e4] dark:border-ochrebright/25 dark:bg-ochrebright/[0.07]"}`}>
       <div className="flex flex-wrap items-center gap-2.5">
-        <span aria-hidden="true" className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold text-white ${approved ? "bg-pine dark:bg-sage dark:text-[#0b1511]" : "bg-ochre"}`}>{approved ? "✓" : "◐"}</span>
+        <span aria-hidden="true" className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold text-white ${approved ? "bg-pine dark:bg-sage dark:text-[#16241b]" : "bg-ochre"}`}>{approved ? "✓" : "◐"}</span>
         <p className="font-serif text-lg font-bold tracking-tight">{approved ? "Editor approved" : "Editor draft"}</p>
         <span className="rounded-full bg-white/70 px-2.5 py-1 font-mono text-[11px] font-medium text-fog ring-1 ring-black/5 dark:bg-white/[0.06] dark:ring-white/10">
           {revs} revision{revs === 1 ? "" : "s"}

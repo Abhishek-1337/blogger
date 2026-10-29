@@ -18,7 +18,7 @@ export default function Outline({ sections }: { sections: OutlineSection[] }) {
           <span aria-hidden="true" className="absolute bottom-4 left-[15px] top-4 w-px bg-line dark:bg-white/10" />
           {sections.map((section, i) => (
             <li key={i} className="relative flex gap-4 py-4 sm:gap-5">
-              <span aria-hidden="true" className="relative z-10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-pine font-mono text-[12px] font-semibold text-white ring-4 ring-white dark:bg-sage dark:text-[#0b1511] dark:ring-panel">
+              <span aria-hidden="true" className="relative z-10 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-pine font-mono text-[12px] font-semibold text-white ring-4 ring-white dark:bg-sage dark:text-[#16241b] dark:ring-panel">
                 {i + 1}
               </span>
               <div className="min-w-0 pt-0.5">

@@ -11,18 +11,18 @@
   --color-pinedeep: #0f4436;
   --color-pinebright: #1e7a62;
   --color-ochre: #b7791f;
-  --color-ochrebright: #d9a44a;
+  --color-ochrebright: #cea25e;
   --color-ink: #16211c;
   --color-fog: #5f6d66;
   --color-line: #dde3dd;
   --color-wash: #e7ede8;
   --color-paper: #eff3ef;
   --color-clay: #9c3d2e;
-  --color-night: #0b120e;
-  --color-panel: #121b16;
-  --color-field: #0a0f0c;
-  --color-sage: #8fd0ae;
-  --color-rose: #e8a090;
+  --color-night: #242924;
+  --color-panel: #1e211e;
+  --color-field: #262b26;
+  --color-sage: #a8d8bc;
+  --color-rose: #df9d8d;
 
   --shadow-card: 0 1px 2px rgba(22, 33, 28, 0.05), 0 8px 24px rgba(22, 33, 28, 0.06);
   --shadow-lift: 0 2px 4px rgba(22, 33, 28, 0.06), 0 16px 40px rgba(22, 33, 28, 0.1);
@@ -31,13 +31,13 @@
 }
 
 .dark {
-  --color-ink: #e9ede6;
-  --color-fog: #9aa79d;
-  --color-line: #223028;
-  --color-wash: #182019;
-  --color-paper: #0b120e;
-  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 12px 32px rgba(0, 0, 0, 0.45);
-  --shadow-lift: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 20px 48px rgba(0, 0, 0, 0.55);
+  --color-ink: #ecefec;
+  --color-fog: #a7afa7;
+  --color-line: #343b34;
+  --color-wash: #2b332b;
+  --color-paper: #242924;
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 10px 28px rgba(0, 0, 0, 0.28);
+  --shadow-lift: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 18px 44px rgba(0, 0, 0, 0.35);
 }
 
 @keyframes rise {
@@ -57,18 +57,18 @@ html.dark { color-scheme: dark; background-color: var(--color-night); }
 body { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
 
 ::selection { background: var(--color-pine); color: #fff; }
-.dark ::selection { background: rgba(143, 208, 174, 0.35); color: #f3f6f0; }
+.dark ::selection { background: rgba(168, 216, 188, 0.28); color: #edf2ea; }
 
 :focus-visible { outline: 2px solid var(--color-pine); outline-offset: 2px; border-radius: 4px; }
-.dark :focus-visible { outline-color: rgba(143, 208, 174, 0.7); }
+.dark :focus-visible { outline-color: rgba(168, 216, 188, 0.55); }
 
 * { scrollbar-width: thin; scrollbar-color: #b9c6bc transparent; }
-.dark * { scrollbar-color: #2f3a31 transparent; }
+.dark * { scrollbar-color: #414a41 transparent; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: #b9c6bc; border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
-.dark ::-webkit-scrollbar-thumb { background: #2a342c; border-color: #0b120e; }
+.dark ::-webkit-scrollbar-thumb { background: #414a41; border-color: #242924; }
 ::-webkit-scrollbar-track { background: transparent; }
-.dark input::placeholder { color: #78817a; }
+.dark input::placeholder { color: #8a968b; }
 
 /* ---- Markdown reading view ---- */
 .md-body { line-height: 1.75; overflow-wrap: break-word; }
@@ -91,14 +91,14 @@ body { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; 
 .md-body li::marker { color: var(--color-ochre); }
 .md-body a { color: var(--color-pine); text-decoration: underline; text-underline-offset: 3px; }
 .md-body strong { color: var(--color-ink); }
-.dark .md-body { color: #cfd6ca; }
-.dark .md-body strong { color: #eef2e9; }
+.dark .md-body { color: #c8d0c3; }
+.dark .md-body strong { color: #e6ebe1; }
 .md-body code, .dark .md-body code {
   background: rgba(23, 94, 76, 0.08); border: 1px solid rgba(23, 94, 76, 0.14);
   border-radius: 6px; padding: 0.1em 0.35em; font-size: 0.88em;
   font-family: var(--font-mono);
 }
-.dark .md-body code { background: rgba(143, 208, 174, 0.1); border-color: rgba(143, 208, 174, 0.18); color: #c9e8d4; }
+.dark .md-body code { background: rgba(168, 216, 188, 0.09); border-color: rgba(168, 216, 188, 0.16); color: #c4e6d2; }
 .md-body pre, .dark .md-body pre {
   background: #101613; color: #dbe4da; border: 1px solid rgba(255,255,255,0.08);
   border-radius: 12px; padding: 14px 16px; overflow-x: auto; margin: 0 0 14px;
@@ -107,7 +107,8 @@ body { text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; 
 .md-body blockquote {
   border-left: 3px solid var(--color-ochre); padding: 2px 0 2px 14px; margin: 0 0 14px; color: var(--color-fog);
 }
-.dark .md-body blockquote { border-color: rgba(143, 208, 174, 0.4); color: #b9c1b1; }
+.dark .md-body blockquote { border-color: rgba(168, 216, 188, 0.32); color: #aeb8a8; }
+.dark .md-body pre { background: #171a17; }
 .md-body hr { border-color: var(--color-line); margin: 20px 0; }
 .md-body table { width: 100%; border-collapse: collapse; margin: 0 0 14px; font-size: 14px; }
 .md-body th, .md-body td { border: 1px solid var(--color-line); padding: 7px 10px; text-align: left; }

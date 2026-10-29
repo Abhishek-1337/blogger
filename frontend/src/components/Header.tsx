@@ -29,7 +29,7 @@ export default function Header({ onMenu, user, onSignOut }: HeaderProps) {
   }, [menuOpen]);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-white/85 backdrop-blur-md dark:border-white/[0.07] dark:bg-night/85">
+    <header className="sticky top-0 z-40 border-b border-line bg-white/85 backdrop-blur-md dark:border-white/[0.07] dark:bg-[#151715]/90">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5">
         <div className="flex items-center gap-3">
           {onMenu && (
@@ -39,7 +39,7 @@ export default function Header({ onMenu, user, onSignOut }: HeaderProps) {
             </button>
           )}
           <a href="#" onClick={(e) => e.preventDefault()} className="flex items-center gap-2.5" aria-label="Blogger home">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-pinedeep font-serif text-xl font-bold text-white shadow-card dark:bg-sage dark:text-[#0b1511]">B</span>
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-pinedeep font-serif text-xl font-bold text-white shadow-card dark:bg-sage dark:text-[#16241b]">B</span>
             <span className="font-serif text-[22px] font-bold leading-none tracking-tight">Blogger</span>
           </a>
           <span className="ml-1 hidden rounded-full border border-line px-2.5 py-1 font-mono text-[11px] font-medium text-fog sm:inline dark:border-white/10">Research → Draft</span>
@@ -54,7 +54,7 @@ export default function Header({ onMenu, user, onSignOut }: HeaderProps) {
                 {user.picture ? (
                   <img src={user.picture} alt="" referrerPolicy="no-referrer" className="h-8 w-8 rounded-full ring-1 ring-line dark:ring-white/20" />
                 ) : (
-                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-pine text-sm font-bold text-white dark:bg-sage dark:text-[#0b1511]">{(user.name || user.email || "?").charAt(0).toUpperCase()}</span>
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-pine text-sm font-bold text-white dark:bg-sage dark:text-[#16241b]">{(user.name || user.email || "?").charAt(0).toUpperCase()}</span>
                 )}
                 <span className="hidden max-w-[140px] truncate text-sm font-medium md:block">{user.name?.split(" ")[0] || "Account"}</span>
                 <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="text-fog"><path d="M5 8l5 5 5-5" /></svg>

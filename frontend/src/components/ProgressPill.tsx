@@ -24,7 +24,7 @@ export default function ProgressPill({ stages, active }: ProgressPillProps) {
           return (
             <li key={s} aria-current={current ? "step" : undefined} className="flex items-start gap-2.5">
               <span aria-hidden="true" className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-mono text-[11px] font-semibold ring-1 ${
-                done ? "bg-pine text-white ring-pine dark:bg-sage dark:text-[#0b1511] dark:ring-sage"
+                done ? "bg-pine text-white ring-pine dark:bg-sage dark:text-[#16241b] dark:ring-sage"
                 : current ? "bg-white text-pine ring-pine dark:bg-sage/15 dark:text-sage dark:ring-sage/50"
                 : "bg-wash text-fog ring-line dark:bg-white/[0.05] dark:ring-white/10"}`}>
                 {done ? "✓" : i + 1}
