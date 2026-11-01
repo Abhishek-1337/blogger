@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 
 from src.auth import get_admin_user
 from src.models import User
+from src.rate_limit import limit_admin_reads
 from src.types import UsageCallOut, UsageQueryRowOut, UsageSummaryOut
 
 from .shared import (
@@ -14,25 +15,25 @@ from .shared import (
 router = APIRouter()
 
 
-@router.get("/usage/summary", response_model=UsageSummaryOut)
+@router.get("/usage/summary", response_model=UsageSummaryOut, dependencies=[Depends(limit_admin_reads)])
 @db_errors
 async def get_usage_summary(user: User = Depends(get_admin_user)):
     return await build_usage_summary(user.id, recent_limit=10)
 
 
-@router.get("/usage/overview", response_model=UsageSummaryOut)
+@router.get("/usage/overview", response_model=UsageSummaryOut, dependencies=[Depends(limit_admin_reads)])
 @db_errors
 async def get_usage_overview(user: User = Depends(get_admin_user)):
     return await build_usage_summary(None, recent_limit=50)
 
 
-@router.get("/usage/recent", response_model=list[UsageQueryRowOut])
+@router.get("/usage/recent", response_model=list[UsageQueryRowOut], dependencies=[Depends(limit_admin_reads)])
 @db_errors
 async def get_usage_recent(limit: int = 50, user: User = Depends(get_admin_user)):
     return await recent_usage_rows(user.id, limit)
 
 
-@router.get("/searches/{entry_id}/usage", response_model=list[UsageCallOut])
+@router.get("/searches/{entry_id}/usage", response_model=list[UsageCallOut], dependencies=[Depends(limit_admin_reads)])
 @db_errors
 async def get_search_usage(entry_id: int, user: User = Depends(get_admin_user)):
     return await entry_usage_calls(entry_id)

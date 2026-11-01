@@ -8,6 +8,7 @@ from src.auth import (
 )
 from src.db import SessionLocal
 from src.models import User
+from src.rate_limit import limit_login, limit_reads
 from src.types import GoogleLoginRequest, LoginResponse, UserOut
 
 from .shared import to_user_out
@@ -15,7 +16,7 @@ from .shared import to_user_out
 router = APIRouter()
 
 
-@router.post("/auth/google", response_model=LoginResponse)
+@router.post("/auth/google", response_model=LoginResponse, dependencies=[Depends(limit_login)])
 async def google_login(req: GoogleLoginRequest):
     try:
         claims = verify_google_token(req.id_token)
@@ -26,6 +27,6 @@ async def google_login(req: GoogleLoginRequest):
     return LoginResponse(token=create_access_token(user.id), user=to_user_out(user))
 
 
-@router.get("/auth/me", response_model=UserOut)
+@router.get("/auth/me", response_model=UserOut, dependencies=[Depends(limit_reads)])
 async def me(user: User = Depends(get_current_user)):
     return to_user_out(user)

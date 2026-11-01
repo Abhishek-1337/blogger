@@ -7,6 +7,7 @@ from src.db import (
     list_search_entries,
 )
 from src.models import User
+from src.rate_limit import limit_generation, limit_polling, limit_reads
 from src.services.celery_app import celery_app
 from src.types import (
     BlogRequest,
@@ -22,7 +23,7 @@ from .shared import db_errors, to_blog_response
 router = APIRouter()
 
 
-@router.get("/searches", response_model=list[SearchSummaryOut])
+@router.get("/searches", response_model=list[SearchSummaryOut], dependencies=[Depends(limit_reads)])
 @db_errors
 async def list_searches(limit: int = 50, user: User = Depends(get_current_user)):
     entries = await list_search_entries(min(max(limit, 1), 200), user.id)
@@ -37,7 +38,7 @@ async def list_searches(limit: int = 50, user: User = Depends(get_current_user))
     ]
 
 
-@router.get("/searches/{entry_id}", response_model=BlogResponse)
+@router.get("/searches/{entry_id}", response_model=BlogResponse, dependencies=[Depends(limit_reads)])
 @db_errors
 async def get_search(entry_id: int, user: User = Depends(get_current_user)):
     entry = await get_search_entry(entry_id, user.id)
@@ -46,7 +47,7 @@ async def get_search(entry_id: int, user: User = Depends(get_current_user)):
     return to_blog_response(entry)
 
 
-@router.post("/blog/enqueue", response_model=EnqueueResponse, status_code=202)
+@router.post("/blog/enqueue", response_model=EnqueueResponse, status_code=202, dependencies=[Depends(limit_generation)])
 @db_errors
 async def enqueue_blog(req: BlogRequest, user: User = Depends(get_current_user)):
     query = req.query.strip()
@@ -59,7 +60,7 @@ async def enqueue_blog(req: BlogRequest, user: User = Depends(get_current_user))
     return EnqueueResponse(task_id=task.id, status="queued")
 
 
-@router.get("/blog/tasks/{task_id}", response_model=TaskStatusResponse)
+@router.get("/blog/tasks/{task_id}", response_model=TaskStatusResponse, dependencies=[Depends(limit_polling)])
 @db_errors
 async def get_blog_task(task_id: str, user: User = Depends(get_current_user)):
     try:
