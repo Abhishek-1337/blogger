@@ -1,20 +1,3 @@
-"""Tiered rate limiting: per-user (or per-IP) plus a global ceiling.
-
-Limits are fixed-window counters stored in Redis so every API process
-shares one budget. Redis DB 2 is used by default to keep limiter keys
-away from the Celery broker (DB 0) and result backend (DB 1).
-
-All limits are configurable through environment variables; see
-``.env.example``. Set ``RATE_LIMIT_ENABLED=false`` to disable the
-limiter entirely (kill switch).
-
-Failure mode: if the limiter backend is unreachable the limiter fails
-open (requests are allowed, a warning is logged). Generation is still
-protected in that case because enqueueing itself needs the same Redis.
-Set ``RATE_LIMIT_FAIL_CLOSED=true`` to reject generation/login with
-503 instead while the limiter backend is down.
-"""
-
 import logging
 import math
 import os
