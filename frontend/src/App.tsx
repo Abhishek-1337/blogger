@@ -112,6 +112,8 @@ function Workspace() {
   const [libraryCollapsed, setLibraryCollapsed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [resultView, setResultView] = useState<"outline" | "research" | "editor">("outline");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const resultsRef = useRef<HTMLElement>(null);
 
   const loadHistory = useCallback(async () => {
@@ -139,6 +141,14 @@ function Workspace() {
 
   useEffect(() => { if (result) resultsRef.current?.scrollIntoView({ block: "start" }); }, [result]);
   useEffect(() => { if (!copied) return; const t = setTimeout(() => setCopied(false), 2000); return () => clearTimeout(t); }, [copied]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    function onPointer(e: MouseEvent) { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false); }
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setMenuOpen(false); }
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onPointer); document.removeEventListener("keydown", onKey); };
+  }, [menuOpen]);
 
   function newSearch() {
     setQuery(""); setResult(null); setSelectedId(null); setError(""); setSidebarOpen(false); setViewingSaved(false); setLibraryCollapsed(false); setResultView("outline");
@@ -223,9 +233,17 @@ function Workspace() {
               <p className="font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-ochre dark:text-ochrebright">Your post</p>
               <h2 className="mt-1 truncate font-serif text-[28px] font-bold leading-tight tracking-tight" title={result.query}>{result.query}</h2>
             </div>
-            <div className="flex gap-2">
-              <button type="button" onClick={copyResult} className="rounded-lg border border-line bg-white px-3.5 py-2 text-sm font-semibold shadow-card transition hover:bg-wash dark:border-white/10 dark:bg-panel dark:hover:bg-white/[0.07]">{copied ? "Copied ✓" : "Copy markdown"}</button>
-              <button type="button" onClick={downloadResult} className="rounded-lg bg-pine px-3.5 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-pinedeep dark:bg-sage dark:text-[#16241b] dark:hover:bg-[#b9e4cb]">Download .md</button>
+            <div ref={menuRef} className="relative">
+              <button type="button" aria-haspopup="menu" aria-expanded={menuOpen} aria-label="Post actions" onClick={() => setMenuOpen((v) => !v)}
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-line bg-white text-ink shadow-card transition hover:bg-wash dark:border-white/10 dark:bg-panel dark:text-white dark:hover:bg-white/[0.07]">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="3" r="1.6" /><circle cx="8" cy="8" r="1.6" /><circle cx="8" cy="13" r="1.6" /></svg>
+              </button>
+              {menuOpen && (
+                <div role="menu" aria-label="Post actions" className="absolute right-0 z-20 mt-2 w-44 overflow-hidden rounded-xl border border-line bg-white py-1 shadow-lift dark:border-white/10 dark:bg-panel">
+                  <button type="button" role="menuitem" onClick={() => { void copyResult(); setMenuOpen(false); }} className="block w-full px-4 py-2 text-left text-sm font-medium transition hover:bg-wash dark:hover:bg-white/[0.07]">{copied ? "Copied ✓" : "Copy markdown"}</button>
+                  <button type="button" role="menuitem" onClick={() => { downloadResult(); setMenuOpen(false); }} className="block w-full px-4 py-2 text-left text-sm font-medium transition hover:bg-wash dark:hover:bg-white/[0.07]">Download .md</button>
+                </div>
+              )}
             </div>
           </div>
           <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="Result views">
