@@ -111,6 +111,7 @@ function Workspace() {
   const [viewingSaved, setViewingSaved] = useState(false);
   const [libraryCollapsed, setLibraryCollapsed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [resultView, setResultView] = useState<"outline" | "research" | "editor">("outline");
   const resultsRef = useRef<HTMLElement>(null);
 
   const loadHistory = useCallback(async () => {
@@ -140,7 +141,7 @@ function Workspace() {
   useEffect(() => { if (!copied) return; const t = setTimeout(() => setCopied(false), 2000); return () => clearTimeout(t); }, [copied]);
 
   function newSearch() {
-    setQuery(""); setResult(null); setSelectedId(null); setError(""); setSidebarOpen(false); setViewingSaved(false); setLibraryCollapsed(false);
+    setQuery(""); setResult(null); setSelectedId(null); setError(""); setSidebarOpen(false); setViewingSaved(false); setLibraryCollapsed(false); setResultView("outline");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -148,7 +149,7 @@ function Workspace() {
     const topic = query.trim();
     if (!topic) { setError("Enter a topic first — anything you want to write about."); return; }
     if (!token) { setError("Please sign in again."); return; }
-    setError(""); setResult(null); setSelectedId(null); setActiveStage(0); setBusy(true); setViewingSaved(false); setLibraryCollapsed(false);
+    setError(""); setResult(null); setSelectedId(null); setActiveStage(0); setBusy(true); setViewingSaved(false); setLibraryCollapsed(false); setResultView("outline");
     try {
       const data = await fetchBlog(topic, API_URL, token, (stage) => {
         const idx = STAGE_KEYS.indexOf(stage);
@@ -165,7 +166,7 @@ function Workspace() {
     setError(""); setSelectingId(id);
     try {
       const data = await fetchSearch(API_URL, id, token);
-      setResult(data); setSelectedId(data.id ?? id); setQuery(data.query); setSidebarOpen(false); setViewingSaved(true); setLibraryCollapsed(true);
+      setResult(data); setSelectedId(data.id ?? id); setQuery(data.query); setSidebarOpen(false); setViewingSaved(true); setLibraryCollapsed(true); setResultView("outline");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
     } finally { setSelectingId(null); }
@@ -227,9 +228,33 @@ function Workspace() {
               <button type="button" onClick={downloadResult} className="rounded-lg bg-pine px-3.5 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-pinedeep dark:bg-sage dark:text-[#16241b] dark:hover:bg-[#b9e4cb]">Download .md</button>
             </div>
           </div>
-          <div className="mt-4"><Verdict data={result} /></div>
-          <ResearchBrief brief={result.research_brief} />
-          <Outline sections={result.sections || []} />
+          <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="Result views">
+            {([
+              { key: "outline", label: "Outline" },
+              { key: "research", label: "Research brief" },
+              { key: "editor", label: "Editor review" },
+            ] as const).map((v) => (
+              <button
+                key={v.key}
+                type="button"
+                role="tab"
+                aria-selected={resultView === v.key}
+                onClick={() => setResultView(v.key)}
+                className={`rounded-lg border px-3.5 py-2 text-sm font-semibold shadow-card transition ${resultView === v.key ? "border-pine bg-pine text-white dark:border-sage dark:bg-sage dark:text-[#16241b]" : "border-line bg-white hover:bg-wash dark:border-white/10 dark:bg-panel dark:hover:bg-white/[0.07]"}`}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
+          <div className="mt-4" role="tabpanel">
+            {resultView === "editor" ? (
+              <Verdict data={result} />
+            ) : resultView === "research" ? (
+              <ResearchBrief brief={result.research_brief} />
+            ) : (
+              <Outline sections={result.sections || []} />
+            )}
+          </div>
         </section>
       )}
     </Shell>
