@@ -37,6 +37,28 @@ else:
 engine = create_async_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
+async def find_entry_id_by_query(
+    query: str, user_id: int | None = None
+) -> int | None:
+    normalized = query.strip().lower()
+    async with SessionLocal() as session:
+        stmt = (
+            select(SearchEntry.id)
+            .where(func.lower(func.trim(SearchEntry.query)) == normalized)
+            .order_by(desc(SearchEntry.id))
+        )
+        if user_id is not None:
+            stmt = stmt.where(SearchEntry.user_id == user_id)
+        result = await session.execute(stmt.limit(1))
+        row = result.first()
+        return row[0] if row else None
+
+
+async def has_query(query: str, user_id: int | None = None) -> bool:
+    return await find_entry_id_by_query(query, user_id) is not None
+
+    
+
 
 async def save_search_entry(data: dict, user_id: int | None = None) -> int:
     async with SessionLocal() as session:

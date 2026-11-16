@@ -60,7 +60,11 @@ export async function fetchBlog(
   if (!res.ok) {
     throw new Error(await readError(res, `Request failed (${res.status}).`));
   }
-  const { task_id } = (await res.json()) as { task_id: string };
+  const body = (await res.json()) as { task_id: string; status: string; entry_id?: number | null };
+  if (body.status === "duplicate" && body.entry_id != null) {
+    return fetchSearch(apiUrl, body.entry_id, token);
+  }
+  const { task_id } = body;
   for (let i = 0; i < 300; i++) {
     await sleep(2000);
     const st = await fetch(`${apiUrl}/blog/tasks/${task_id}`, {

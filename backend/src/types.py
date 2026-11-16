@@ -26,6 +26,7 @@ class BlogRequest(BaseModel):
 class EnqueueResponse(BaseModel):
     task_id: str
     status: str = "queued"
+    entry_id: int | None = None
 
 
 class TaskStatusResponse(BaseModel):

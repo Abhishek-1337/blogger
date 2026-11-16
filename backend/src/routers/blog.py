@@ -1,8 +1,10 @@
 from celery.result import AsyncResult
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 
 from src.auth import get_current_user
 from src.db import (
+    find_entry_id_by_query,
     get_search_entry,
     list_search_entries,
 )
@@ -53,6 +55,13 @@ async def enqueue_blog(req: BlogRequest, user: User = Depends(get_current_user))
     query = req.query.strip()
     if not query:
         raise HTTPException(status_code=422, detail="Query must not be empty.")
+    existing_id = await find_entry_id_by_query(query, user.id)
+    if existing_id is not None:
+        return JSONResponse(
+            status_code=200,
+            content={"task_id": "", "status": "duplicate", "entry_id": existing_id},
+        )
+
     try:
         task = generate_blog_task.delay(query, user.id)
     except Exception as e:
