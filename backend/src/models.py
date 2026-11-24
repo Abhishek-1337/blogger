@@ -50,6 +50,7 @@ class SearchEntry(Base):
     user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id"), nullable=True, index=True
     )
+    hashed_key: Mapped[str] = mapped_column(Text)
     query: Mapped[str] = mapped_column(Text, nullable=False)
     research_brief: Mapped[str] = mapped_column(Text, nullable=False, default="")
     outline: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
@@ -60,3 +61,4 @@ class SearchEntry(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+    last_updated: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
