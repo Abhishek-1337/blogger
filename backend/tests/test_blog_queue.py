@@ -155,7 +155,7 @@ class HasQueryTest(unittest.TestCase):
         _FakeSession.row = (1,)
         self.assertTrue(_run_has_query("  HELLO World ", 1))
         params = _FakeSession.captured[-1].compile().params
-        self.assertIn("hello world", params.values())
+        self.assertIn(db_module.query_key_hash("hello world"), params.values())
 
     def test_match_is_scoped_to_user(self):
         _FakeSession.row = (1,)
