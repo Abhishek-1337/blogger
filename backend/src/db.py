@@ -1,3 +1,4 @@
+import hashlib
 import os
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -37,14 +38,17 @@ else:
 engine = create_async_engine(DATABASE_URL, connect_args=connect_args)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
+def query_key_hash(query: str) -> str:
+    return hashlib.sha256((query or "").strip().lower().encode("utf-8")).hexdigest()
+
+
 async def find_entry_id_by_query(
     query: str, user_id: int | None = None
 ) -> int | None:
-    normalized = query.strip().lower()
     async with SessionLocal() as session:
         stmt = (
             select(SearchEntry.id)
-            .where(func.lower(func.trim(SearchEntry.query)) == normalized)
+            .where(SearchEntry.hashed_key == query_key_hash(query))
             .order_by(desc(SearchEntry.id))
         )
         if user_id is not None:
@@ -64,6 +68,7 @@ async def save_search_entry(data: dict, user_id: int | None = None) -> int:
     async with SessionLocal() as session:
         entry = SearchEntry(
             user_id=user_id,
+            hashed_key=query_key_hash(data.get("query", "")),
             query=data.get("query", ""),
             research_brief=data.get("research_brief", ""),
             outline=data.get("outline", []),

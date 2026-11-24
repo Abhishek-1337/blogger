@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, Text, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, Text, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -45,6 +45,9 @@ class LlmUsageEvent(Base):
 
 class SearchEntry(Base):
     __tablename__ = "search_entries"
+    __table_args__ = (
+        UniqueConstraint("user_id", "hashed_key", name="uq_search_entries_user_hashed_key"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int | None] = mapped_column(
