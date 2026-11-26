@@ -24,6 +24,79 @@ def _run(chunks):
     return stages, final
 
 
+class _FakeStructuredLLM:
+    def __init__(self, captured):
+        self._captured = captured
+
+    async def ainvoke(self, prompt, config=None):
+        self._captured.append(prompt)
+        return graph.BlogOutline(
+            sections=[
+                graph.OutlineSection(title=f"Section {i}", bullets=["a", "b", "c"])
+                for i in range(1, 5)
+            ]
+        )
+
+
+class _FakeLLM:
+    def __init__(self, captured):
+        self._captured = captured
+
+    def with_structured_output(self, _model):
+        return _FakeStructuredLLM(self._captured)
+
+
+def _run_outline(state):
+    captured = []
+    with patch.object(graph, "_llm", lambda _temp=0.3: _FakeLLM(captured)):
+        result = asyncio.run(graph.outline_node(state))
+    return captured[0], result
+
+
+def _base_state(**overrides):
+    state = {
+        "query": "topic",
+        "research_brief": "brief",
+        "sections": [],
+        "outline": [],
+        "outline_feedback": "",
+        "outline_revisions": 0,
+        "outline_approved": False,
+    }
+    state.update(overrides)
+    return state
+
+
+class OutlineRetryPromptTest(unittest.TestCase):
+    def test_retry_prompt_mentions_failed_approval_and_feedback(self):
+        prompt, _result = _run_outline(
+            _base_state(
+                sections=[{"title": "Old", "bullets": ["x", "y", "z"]}],
+                outline_feedback="Add a section on costs; drop the generic intro.",
+                outline_revisions=1,
+                outline_approved=False,
+            )
+        )
+        self.assertIn("last outline approval failed", prompt.lower())
+        self.assertIn("Add a section on costs; drop the generic intro.", prompt)
+        self.assertIn("Old", prompt)
+
+    def test_retry_with_empty_feedback_still_mentions_failed_approval(self):
+        prompt, _result = _run_outline(
+            _base_state(
+                sections=[{"title": "Old", "bullets": ["x", "y", "z"]}],
+                outline_feedback="",
+                outline_revisions=1,
+                outline_approved=False,
+            )
+        )
+        self.assertIn("last outline approval failed", prompt.lower())
+
+    def test_first_run_prompt_has_no_failed_approval_mention(self):
+        prompt, _result = _run_outline(_base_state())
+        self.assertNotIn("last outline approval failed", prompt.lower())
+
+
 class GraphProgressTest(unittest.TestCase):
     def test_reports_each_stage_in_order(self):
         stages, final = _run(
