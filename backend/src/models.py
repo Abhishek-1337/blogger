@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, Text, UniqueConstraint, func
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Base(DeclarativeBase):
@@ -43,17 +43,11 @@ class LlmUsageEvent(Base):
     )
 
 
-class SearchEntry(Base):
-    __tablename__ = "search_entries"
-    __table_args__ = (
-        UniqueConstraint("user_id", "hashed_key", name="uq_search_entries_user_hashed_key"),
-    )
+class BlogContent(Base):
+    __tablename__ = "blog_contents"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id"), nullable=True, index=True
-    )
-    hashed_key: Mapped[str] = mapped_column(Text)
+    hashed_key: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     query: Mapped[str] = mapped_column(Text, nullable=False)
     research_brief: Mapped[str] = mapped_column(Text, nullable=False, default="")
     outline: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
@@ -64,4 +58,25 @@ class SearchEntry(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
-    last_updated: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_updated: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class SearchEntry(Base):
+    __tablename__ = "search_entries"
+    __table_args__ = (
+        UniqueConstraint("user_id", "content_id", name="uq_search_entries_user_content"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True, index=True
+    )
+    content_id: Mapped[int] = mapped_column(
+        ForeignKey("blog_contents.id"), nullable=False, index=True
+    )
+    query: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    content: Mapped[BlogContent] = relationship(lazy="joined")
