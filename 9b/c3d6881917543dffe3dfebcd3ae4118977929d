@@ -1,0 +1,9 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "autter_version": "3.10.1",
+  "base_commit_sha": "9bc3d6881917543dffe3dfebcd3ae4118977929d",
+  "branch": "main",
+  "prompts": {},
+  "integrity": {"v":1,"commit":"9bc3d6881917543dffe3dfebcd3ae4118977929d","tree":"003587fb84630e98909050722869ef7b7712d3b8","files":{},"digest":"ca21400deb1f292c493af26cd94fcd2a756b229764883d805e1c20000d20b006"}
+}
