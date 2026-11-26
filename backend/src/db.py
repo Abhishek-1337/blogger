@@ -4,9 +4,11 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from dotenv import load_dotenv
 from sqlalchemy import desc, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.orm import joinedload
 
-from src.models import LlmUsageEvent, SearchEntry, User
+from src.models import BlogContent, LlmUsageEvent, SearchEntry, User
 
 load_dotenv()
 
@@ -48,7 +50,8 @@ async def find_entry_id_by_query(
     async with SessionLocal() as session:
         stmt = (
             select(SearchEntry.id)
-            .where(SearchEntry.hashed_key == query_key_hash(query))
+            .join(BlogContent, SearchEntry.content_id == BlogContent.id)
+            .where(BlogContent.hashed_key == query_key_hash(query))
             .order_by(desc(SearchEntry.id))
         )
         if user_id is not None:
@@ -61,31 +64,126 @@ async def find_entry_id_by_query(
 async def has_query(query: str, user_id: int | None = None) -> bool:
     return await find_entry_id_by_query(query, user_id) is not None
 
-    
+
+async def _get_or_create_search_entry(
+    session, query: str, user_id: int | None, content_id: int
+) -> int:
+    """Return an existing SearchEntry id for (user_id, content_id) or create one."""
+    if user_id is not None:
+        existing = (
+            await session.execute(
+                select(SearchEntry.id)
+                .where(
+                    SearchEntry.user_id == user_id,
+                    SearchEntry.content_id == content_id,
+                )
+                .limit(1)
+            )
+        ).first()
+        if existing is not None:
+            return existing[0]
+
+    entry = SearchEntry(
+        user_id=user_id,
+        content_id=content_id,
+        query=query,
+    )
+    try:
+        async with session.begin_nested():
+            session.add(entry)
+            await session.flush()
+        return entry.id
+    except IntegrityError:
+        if user_id is None:
+            raise
+        existing = (
+            await session.execute(
+                select(SearchEntry.id)
+                .where(
+                    SearchEntry.user_id == user_id,
+                    SearchEntry.content_id == content_id,
+                )
+                .limit(1)
+            )
+        ).first()
+        if existing is None:
+            raise
+        return existing[0]
+
+
+async def _get_or_create_blog_content(session, data: dict) -> BlogContent:
+    """Return an existing BlogContent for the query hash or insert a new one."""
+    query = data.get("query", "")
+    hashed_key = query_key_hash(query)
+    existing = (
+        await session.execute(
+            select(BlogContent).where(BlogContent.hashed_key == hashed_key).limit(1)
+        )
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing
+
+    content = BlogContent(
+        hashed_key=hashed_key,
+        query=query,
+        research_brief=data.get("research_brief", ""),
+        outline=data.get("outline", []),
+        sections=data.get("sections", []),
+        outline_approved=data.get("outline_approved", False),
+        outline_revisions=data.get("outline_revisions", 0),
+        outline_feedback=data.get("outline_feedback", ""),
+    )
+    try:
+        async with session.begin_nested():
+            session.add(content)
+            await session.flush()
+        return content
+    except IntegrityError:
+        existing = (
+            await session.execute(
+                select(BlogContent).where(BlogContent.hashed_key == hashed_key).limit(1)
+            )
+        ).scalar_one_or_none()
+        if existing is None:
+            raise
+        return existing
+
+
+async def find_or_link_entry_by_query(query: str, user_id: int) -> int | None:
+    """Return user's SearchEntry id if query is cached, linking a new entry on cross-user hit."""
+    async with SessionLocal() as session:
+        row = (
+            await session.execute(
+                select(BlogContent.id)
+                .where(BlogContent.hashed_key == query_key_hash(query))
+                .limit(1)
+            )
+        ).first()
+        if row is None:
+            return None
+        content_id = row[0]
+        entry_id = await _get_or_create_search_entry(session, query, user_id, content_id)
+        await session.commit()
+        return entry_id
 
 
 async def save_search_entry(data: dict, user_id: int | None = None) -> int:
     async with SessionLocal() as session:
-        entry = SearchEntry(
-            user_id=user_id,
-            hashed_key=query_key_hash(data.get("query", "")),
-            query=data.get("query", ""),
-            research_brief=data.get("research_brief", ""),
-            outline=data.get("outline", []),
-            sections=data.get("sections", []),
-            outline_approved=data.get("outline_approved", False),
-            outline_revisions=data.get("outline_revisions", 0),
-            outline_feedback=data.get("outline_feedback", ""),
+        content = await _get_or_create_blog_content(session, data)
+        entry_id = await _get_or_create_search_entry(
+            session, data.get("query", ""), user_id, content.id
         )
-        session.add(entry)
         await session.commit()
-        await session.refresh(entry)
-        return entry.id
+        return entry_id
 
 
 async def list_search_entries(limit: int = 50, user_id: int | None = None) -> list[SearchEntry]:
     async with SessionLocal() as session:
-        stmt = select(SearchEntry).order_by(desc(SearchEntry.created_at), desc(SearchEntry.id))
+        stmt = (
+            select(SearchEntry)
+            .options(joinedload(SearchEntry.content))
+            .order_by(desc(SearchEntry.created_at), desc(SearchEntry.id))
+        )
         if user_id is not None:
             stmt = stmt.where(SearchEntry.user_id == user_id)
         result = await session.execute(stmt.limit(limit))
