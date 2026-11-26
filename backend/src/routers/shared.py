@@ -39,15 +39,16 @@ def to_user_out(user: User) -> UserOut:
 
 
 def to_blog_response(entry: SearchEntry) -> BlogResponse:
+    content = entry.content
     return BlogResponse(
         id=entry.id,
         query=entry.query,
-        research_brief=entry.research_brief,
-        outline=list(entry.outline or []),
-        sections=list(entry.sections or []),
-        outline_approved=entry.outline_approved,
-        outline_revisions=entry.outline_revisions,
-        outline_feedback=entry.outline_feedback,
+        research_brief=content.research_brief,
+        outline=list(content.outline or []),
+        sections=list(content.sections or []),
+        outline_approved=content.outline_approved,
+        outline_revisions=content.outline_revisions,
+        outline_feedback=content.outline_feedback,
     )
 
 

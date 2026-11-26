@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 
 from src.auth import get_current_user
 from src.db import (
-    find_entry_id_by_query,
+    find_or_link_entry_by_query,
     get_search_entry,
     list_search_entries,
 )
@@ -34,7 +34,7 @@ async def list_searches(limit: int = 50, user: User = Depends(get_current_user))
             id=e.id,
             query=e.query,
             created_at=e.created_at,
-            outline_approved=e.outline_approved,
+            outline_approved=e.content.outline_approved,
         )
         for e in entries
     ]
@@ -53,9 +53,10 @@ async def get_search(entry_id: int, user: User = Depends(get_current_user)):
 @db_errors
 async def enqueue_blog(req: BlogRequest, user: User = Depends(get_current_user)):
     query = req.query.strip()
+    
     if not query:
         raise HTTPException(status_code=422, detail="Query must not be empty.")
-    existing_id = await find_entry_id_by_query(query, user.id)
+    existing_id = await find_or_link_entry_by_query(query, user.id)
     if existing_id is not None:
         return JSONResponse(
             status_code=200,
